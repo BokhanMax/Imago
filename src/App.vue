@@ -194,7 +194,7 @@ provide(
 <template>
   <div class="app" @keydown="onKeyDown" tabindex="-1">
     <TopBar />
-    <div class="app-body">
+    <main class="app-body">
       <Sidebar />
       <CanvasArea
         ref="canvasAreaRef"
@@ -205,7 +205,7 @@ provide(
       <Transition name="slide-right">
         <RightPanel v-if="hasImage" />
       </Transition>
-    </div>
+    </main>
     <footer class="statusbar">
       <span>© Max Bokhan, 2026</span>
     </footer>
