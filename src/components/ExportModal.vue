@@ -1,35 +1,52 @@
 <script setup>
-import { ref } from 'vue'
+import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 
-const emit = defineEmits(['close', 'export'])
+const { t } = useI18n();
 
-const format = ref('png')
-const quality = ref(90)
+const emit = defineEmits(["close", "export"]);
+
+const format = ref("png");
+const quality = ref(90);
 
 function doExport() {
-  emit('export', { format: format.value, quality: quality.value })
+  emit("export", { format: format.value, quality: quality.value });
 }
 
 function onBackdropClick(e) {
-  if (e.target === e.currentTarget) emit('close')
+  if (e.target === e.currentTarget) emit("close");
 }
 </script>
 
 <template>
   <div class="modal-backdrop" @click="onBackdropClick">
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Экспорт изображения">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('export.title')"
+    >
       <div class="modal-header">
-        <h2 class="modal-title">Экспорт изображения</h2>
-        <button class="close-btn" @click="$emit('close')" aria-label="Закрыть">
+        <h2 class="modal-title">{{ t("export.title") }}</h2>
+        <button
+          class="close-btn"
+          @click="$emit('close')"
+          :aria-label="t('export.close')"
+        >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path
+              d="M2 2l10 10M12 2L2 12"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
           </svg>
         </button>
       </div>
 
       <div class="modal-body">
         <div class="field-group">
-          <div class="field-label">Формат</div>
+          <div class="field-label">{{ t("export.format") }}</div>
           <div class="format-btns">
             <button
               class="format-btn"
@@ -38,7 +55,7 @@ function onBackdropClick(e) {
             >
               <span class="format-icon">🖼</span>
               <span class="format-name">PNG</span>
-              <span class="format-desc">Без потерь, поддержка прозрачности</span>
+              <span class="format-desc">{{ t("export.pngDesc") }}</span>
             </button>
             <button
               class="format-btn"
@@ -47,7 +64,7 @@ function onBackdropClick(e) {
             >
               <span class="format-icon">📷</span>
               <span class="format-name">JPG</span>
-              <span class="format-desc">Меньше размер, для фото</span>
+              <span class="format-desc">{{ t("export.jpgDesc") }}</span>
             </button>
           </div>
         </div>
@@ -55,7 +72,7 @@ function onBackdropClick(e) {
         <Transition name="fade">
           <div v-if="format === 'jpg'" class="field-group">
             <div class="field-label">
-              Качество
+              {{ t("export.quality") }}
               <span class="quality-val">{{ quality }}%</span>
             </div>
             <input
@@ -67,21 +84,34 @@ function onBackdropClick(e) {
               v-model.number="quality"
             />
             <div class="quality-hints">
-              <span>Низкое</span>
-              <span>Высокое</span>
+              <span>{{ t("export.low") }}</span>
+              <span>{{ t("export.high") }}</span>
             </div>
           </div>
         </Transition>
       </div>
 
       <div class="modal-footer">
-        <button class="btn-secondary" @click="$emit('close')">Отмена</button>
+        <button class="btn-secondary" @click="$emit('close')">
+          {{ t("export.cancel") }}
+        </button>
         <button class="btn-primary" @click="doExport">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1v8M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path
+              d="M7 1v8M4 6l3 3 3-3"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
           </svg>
-          Скачать {{ format.toUpperCase() }}
+          {{ t("export.download", { fmt: format.toUpperCase() }) }}
         </button>
       </div>
     </div>
@@ -130,9 +160,14 @@ function onBackdropClick(e) {
   height: 26px;
   border-radius: var(--radius-xs);
   color: var(--text-tertiary);
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
 
 .modal-body {
   padding: 20px;
@@ -141,7 +176,6 @@ function onBackdropClick(e) {
   gap: 20px;
 }
 
-.field-group {}
 .field-label {
   display: flex;
   align-items: center;
@@ -187,9 +221,21 @@ function onBackdropClick(e) {
   border-color: var(--accent);
   background: var(--accent-light);
 }
-.format-icon { font-size: 20px; line-height: 1; margin-bottom: 2px; }
-.format-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
-.format-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+.format-icon {
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.format-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.format-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
 
 /* Slider */
 .slider {
@@ -203,14 +249,17 @@ function onBackdropClick(e) {
 }
 .slider::-webkit-slider-thumb {
   appearance: none;
-  width: 18px; height: 18px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 1px 4px rgba(78,124,246,0.45);
+  box-shadow: 0 1px 4px rgba(78, 124, 246, 0.45);
   cursor: pointer;
   transition: transform 0.1s;
 }
-.slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
 
 .quality-hints {
   display: flex;
@@ -241,7 +290,9 @@ function onBackdropClick(e) {
   font-size: 13px;
   transition: background 0.12s;
 }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
 
 .btn-secondary {
   padding: 9px 16px;
@@ -252,5 +303,8 @@ function onBackdropClick(e) {
   font-size: 13px;
   transition: background 0.12s;
 }
-.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
 </style>

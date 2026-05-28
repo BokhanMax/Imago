@@ -1,52 +1,55 @@
 <script setup>
-import { inject, watch, computed } from 'vue'
+import { inject, watch, computed } from "vue";
+import { useI18n } from "vue-i18n";
 
-const editor = inject('editor')
+const { t } = useI18n();
+const editor = inject("editor");
 
-const tool = computed(() => editor.currentTool)
+const tool = computed(() => editor.currentTool);
 
-const aspectOptions = [
-  { label: 'Свободно', value: NaN },
-  { label: '1 : 1', value: 1 },
-  { label: '4 : 3', value: 4 / 3 },
-  { label: '3 : 2', value: 3 / 2 },
-  { label: '16 : 9', value: 16 / 9 },
-]
+const aspectOptions = computed(() => [
+  { label: t("crop.free"), value: NaN },
+  { label: "1 : 1", value: 1 },
+  { label: "4 : 3", value: 4 / 3 },
+  { label: "3 : 2", value: 3 / 2 },
+  { label: "16 : 9", value: 16 / 9 },
+]);
 
 function setAspect(val) {
-  editor.cropAspect = val
+  editor.cropAspect = val;
 }
 
 function isActiveAspect(val) {
-  const cur = editor.cropAspect
-  if (isNaN(val) && isNaN(cur)) return true
-  return cur === val
+  const cur = editor.cropAspect;
+  if (isNaN(val) && isNaN(cur)) return true;
+  return cur === val;
 }
 
 // Resize: watch constrain toggle to auto-calc
-let origW = 0, origH = 0
+let origW = 0,
+  origH = 0;
 watch(tool, (t) => {
-  if (t === 'resize') {
-    origW = editor.resizeWidth
-    origH = editor.resizeHeight
+  if (t === "resize") {
+    origW = editor.resizeWidth;
+    origH = editor.resizeHeight;
   }
-})
+});
 
 function onWidthChange(e) {
-  const w = Math.round(Number(e.target.value))
-  if (!w || w < 1) return
-  editor.resizeWidth = w
+  const w = Math.round(Number(e.target.value));
+  if (!w || w < 1) return;
+  editor.resizeWidth = w;
   if (editor.resizeConstrain && origW && origH) {
-    editor.resizeHeight = Math.round(w * (origH / origW))
+    editor.resizeHeight = Math.round(w * (origH / origW));
   }
 }
 
 function onHeightChange(e) {
-  const h = Math.round(Number(e.target.value))
-  if (!h || h < 1) return
-  editor.resizeHeight = h
+  const h = Math.round(Number(e.target.value));
+  if (!h || h < 1) return;
+  editor.resizeHeight = h;
   if (editor.resizeConstrain && origW && origH) {
-    editor.resizeWidth = Math.round(h * (origW / origH))
+    editor.resizeWidth = Math.round(h * (origW / origH));
   }
 }
 </script>
@@ -56,7 +59,7 @@ function onHeightChange(e) {
     <!-- Crop Panel -->
     <template v-if="tool === 'crop'">
       <div class="panel-section">
-        <div class="section-title">Пропорции</div>
+        <div class="section-title">{{ t("crop.title") }}</div>
         <div class="aspect-grid">
           <button
             v-for="opt in aspectOptions"
@@ -64,26 +67,29 @@ function onHeightChange(e) {
             class="aspect-btn"
             :class="{ active: isActiveAspect(opt.value) }"
             @click="setAspect(opt.value)"
-          >{{ opt.label }}</button>
+          >
+            {{ opt.label }}
+          </button>
         </div>
       </div>
       <div class="panel-section">
-        <p class="hint-text">Перетащите рамку на холсте для выбора области обрезки</p>
+        <p class="hint-text">{{ t("crop.hint") }}</p>
       </div>
       <div class="panel-actions">
-        <button class="btn-secondary" @click="editor.cancelCrop">Отмена</button>
-        <button class="btn-primary" @click="editor.applyCrop">Применить</button>
+        <button class="btn-secondary" @click="editor.cancelCrop">
+          {{ t("crop.cancel") }}
+        </button>
+        <button class="btn-primary" @click="editor.applyCrop">
+          {{ t("crop.apply") }}
+        </button>
       </div>
     </template>
 
     <!-- BG Remove Panel -->
     <template v-else-if="tool === 'bg'">
       <div class="panel-section">
-        <div class="section-title">Удаление фона</div>
-        <p class="hint-text">
-          ИИ автоматически определит и удалит фон изображения.
-          Результат сохраняется с прозрачностью (PNG).
-        </p>
+        <div class="section-title">{{ t("bg.title") }}</div>
+        <p class="hint-text">{{ t("bg.hint") }}</p>
       </div>
       <div class="panel-actions">
         <button
@@ -91,12 +97,28 @@ function onHeightChange(e) {
           :disabled="editor.isProcessing"
           @click="editor.applyBgRemove"
         >
-          <svg v-if="!editor.isProcessing" width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z" stroke="currentColor" stroke-width="1.3"/>
-            <path d="M4.5 7l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg
+            v-if="!editor.isProcessing"
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+          >
+            <path
+              d="M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z"
+              stroke="currentColor"
+              stroke-width="1.3"
+            />
+            <path
+              d="M4.5 7l1.8 1.8 3.2-3.6"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
           <div v-else class="spinner-sm" />
-          {{ editor.isProcessing ? 'Обработка…' : 'Убрать фон' }}
+          {{ editor.isProcessing ? t("bg.processing") : t("bg.remove") }}
         </button>
       </div>
     </template>
@@ -104,15 +126,16 @@ function onHeightChange(e) {
     <!-- Resize Panel -->
     <template v-else-if="tool === 'resize'">
       <div class="panel-section">
-        <div class="section-title">Размер изображения</div>
+        <div class="section-title">{{ t("resize.title") }}</div>
         <div class="field-row">
-          <label class="field-label">Ширина</label>
+          <label class="field-label">{{ t("resize.width") }}</label>
           <div class="field-input-wrap">
             <input
               type="number"
               class="field-input"
               :value="editor.resizeWidth"
-              min="1" max="16000"
+              min="1"
+              max="16000"
               @change="onWidthChange"
             />
             <span class="field-unit">px</span>
@@ -120,19 +143,24 @@ function onHeightChange(e) {
         </div>
         <div class="constrain-row">
           <label class="toggle-label">
-            <input type="checkbox" v-model="editor.resizeConstrain" class="toggle-check" />
+            <input
+              type="checkbox"
+              v-model="editor.resizeConstrain"
+              class="toggle-check"
+            />
             <span class="toggle-box" />
-            <span>Сохранять пропорции</span>
+            <span>{{ t("resize.constrain") }}</span>
           </label>
         </div>
         <div class="field-row">
-          <label class="field-label">Высота</label>
+          <label class="field-label">{{ t("resize.height") }}</label>
           <div class="field-input-wrap">
             <input
               type="number"
               class="field-input"
               :value="editor.resizeHeight"
-              min="1" max="16000"
+              min="1"
+              max="16000"
               @change="onHeightChange"
             />
             <span class="field-unit">px</span>
@@ -140,30 +168,47 @@ function onHeightChange(e) {
         </div>
       </div>
       <div class="panel-actions">
-        <button class="btn-primary btn-full" @click="editor.applyResize">Применить</button>
+        <button class="btn-primary btn-full" @click="editor.applyResize">
+          {{ t("resize.apply") }}
+        </button>
       </div>
     </template>
 
     <!-- Spot Panel -->
     <template v-else-if="tool === 'spot'">
       <div class="panel-section">
-        <div class="section-title">Точечная коррекция</div>
+        <div class="section-title">{{ t("spot.title") }}</div>
         <div class="slider-row">
-          <label class="slider-label">Размер кисти</label>
+          <label class="slider-label">{{ t("spot.size") }}</label>
           <div class="slider-wrap">
-            <input type="range" class="slider" min="4" max="80" v-model.number="editor.spotSize" />
+            <input
+              type="range"
+              class="slider"
+              min="4"
+              max="80"
+              v-model.number="editor.spotSize"
+            />
             <span class="slider-value">{{ editor.spotSize }}</span>
           </div>
         </div>
         <div class="slider-row">
-          <label class="slider-label">Сила</label>
+          <label class="slider-label">{{ t("spot.strength") }}</label>
           <div class="slider-wrap">
-            <input type="range" class="slider" min="0.05" max="1" step="0.05" v-model.number="editor.spotStrength" />
-            <span class="slider-value">{{ Math.round(editor.spotStrength * 100) }}%</span>
+            <input
+              type="range"
+              class="slider"
+              min="0.05"
+              max="1"
+              step="0.05"
+              v-model.number="editor.spotStrength"
+            />
+            <span class="slider-value"
+              >{{ Math.round(editor.spotStrength * 100) }}%</span
+            >
           </div>
         </div>
         <p class="hint-text" style="margin-top: 4px">
-          Рисуйте по области, которую нужно сгладить
+          {{ t("spot.hint") }}
         </p>
       </div>
     </template>
@@ -171,60 +216,118 @@ function onHeightChange(e) {
     <!-- Color Panel -->
     <template v-else-if="tool === 'color'">
       <div class="panel-section">
-        <div class="section-title">Цветокоррекция</div>
+        <div class="section-title">{{ t("color.title") }}</div>
 
         <div class="slider-row">
           <div class="slider-header">
-            <label class="slider-label">Яркость</label>
-            <span class="slider-value" :class="{ active: editor.colorBrightness !== 0 }">
-              {{ editor.colorBrightness > 0 ? '+' : '' }}{{ editor.colorBrightness }}
+            <label class="slider-label">{{ t("color.brightness") }}</label>
+            <span
+              class="slider-value"
+              :class="{ active: editor.colorBrightness !== 0 }"
+            >
+              {{ editor.colorBrightness > 0 ? "+" : ""
+              }}{{ editor.colorBrightness }}
             </span>
           </div>
-          <input type="range" class="slider" min="-100" max="100" step="1"
-            v-model.number="editor.colorBrightness" />
-          <div class="slider-ends"><span>Темнее</span><span>Светлее</span></div>
+          <input
+            type="range"
+            class="slider"
+            min="-100"
+            max="100"
+            step="1"
+            v-model.number="editor.colorBrightness"
+          />
+          <div class="slider-ends">
+            <span>{{ t("color.darker") }}</span
+            ><span>{{ t("color.lighter") }}</span>
+          </div>
         </div>
 
         <div class="slider-row">
           <div class="slider-header">
-            <label class="slider-label">Контраст</label>
-            <span class="slider-value" :class="{ active: editor.colorContrast !== 0 }">
-              {{ editor.colorContrast > 0 ? '+' : '' }}{{ editor.colorContrast }}
+            <label class="slider-label">{{ t("color.contrast") }}</label>
+            <span
+              class="slider-value"
+              :class="{ active: editor.colorContrast !== 0 }"
+            >
+              {{ editor.colorContrast > 0 ? "+" : ""
+              }}{{ editor.colorContrast }}
             </span>
           </div>
-          <input type="range" class="slider" min="-100" max="100" step="1"
-            v-model.number="editor.colorContrast" />
-          <div class="slider-ends"><span>Мягче</span><span>Резче</span></div>
+          <input
+            type="range"
+            class="slider"
+            min="-100"
+            max="100"
+            step="1"
+            v-model.number="editor.colorContrast"
+          />
+          <div class="slider-ends">
+            <span>{{ t("color.softer") }}</span
+            ><span>{{ t("color.sharper") }}</span>
+          </div>
         </div>
 
         <div class="slider-row">
           <div class="slider-header">
-            <label class="slider-label">Баланс белого</label>
-            <span class="slider-value" :class="{ active: editor.colorTemperature !== 0 }">
-              {{ editor.colorTemperature > 0 ? '+' : '' }}{{ editor.colorTemperature }}
+            <label class="slider-label">{{ t("color.whiteBalance") }}</label>
+            <span
+              class="slider-value"
+              :class="{ active: editor.colorTemperature !== 0 }"
+            >
+              {{ editor.colorTemperature > 0 ? "+" : ""
+              }}{{ editor.colorTemperature }}
             </span>
           </div>
-          <input type="range" class="slider slider-temp" min="-100" max="100" step="1"
-            v-model.number="editor.colorTemperature" />
-          <div class="slider-ends"><span>❄ Холодный</span><span>☀ Тёплый</span></div>
+          <input
+            type="range"
+            class="slider slider-temp"
+            min="-100"
+            max="100"
+            step="1"
+            v-model.number="editor.colorTemperature"
+          />
+          <div class="slider-ends">
+            <span>{{ t("color.cool") }}</span
+            ><span>{{ t("color.warm") }}</span>
+          </div>
         </div>
 
         <div class="slider-row">
           <div class="slider-header">
-            <label class="slider-label">Насыщенность</label>
-            <span class="slider-value" :class="{ active: editor.colorSaturation !== 0 }">
-              {{ editor.colorSaturation > 0 ? '+' : '' }}{{ editor.colorSaturation }}
+            <label class="slider-label">{{ t("color.saturation") }}</label>
+            <span
+              class="slider-value"
+              :class="{ active: editor.colorSaturation !== 0 }"
+            >
+              {{ editor.colorSaturation > 0 ? "+" : ""
+              }}{{ editor.colorSaturation }}
             </span>
           </div>
-          <input type="range" class="slider" min="-100" max="100" step="1"
-            v-model.number="editor.colorSaturation" />
-          <div class="slider-ends"><span>Серый</span><span>Насыщенный</span></div>
+          <input
+            type="range"
+            class="slider"
+            min="-100"
+            max="100"
+            step="1"
+            v-model.number="editor.colorSaturation"
+          />
+          <div class="slider-ends">
+            <span>{{ t("color.grey") }}</span
+            ><span>{{ t("color.saturated") }}</span>
+          </div>
         </div>
       </div>
       <div class="panel-actions">
-        <button class="btn-ghost btn-sm" @click="editor.resetColorSliders">Сбросить</button>
-        <button class="btn-secondary" @click="editor.cancelColor">Отмена</button>
-        <button class="btn-primary" @click="editor.applyColor">Применить</button>
+        <button class="btn-ghost btn-sm" @click="editor.resetColorSliders">
+          {{ t("color.reset") }}
+        </button>
+        <button class="btn-secondary" @click="editor.cancelColor">
+          {{ t("color.cancel") }}
+        </button>
+        <button class="btn-primary" @click="editor.applyColor">
+          {{ t("color.apply") }}
+        </button>
       </div>
     </template>
 
@@ -233,11 +336,23 @@ function onHeightChange(e) {
       <div class="panel-section empty-panel">
         <div class="empty-icon">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-            <path d="M16 10v6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle
+              cx="16"
+              cy="16"
+              r="13"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-dasharray="3 2"
+            />
+            <path
+              d="M16 10v6l3.5 3.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
           </svg>
         </div>
-        <p>Выберите инструмент на панели слева</p>
+        <p>{{ t("move.hint") }}</p>
       </div>
     </template>
   </aside>
@@ -350,7 +465,9 @@ function onHeightChange(e) {
   color: var(--text-secondary);
   user-select: none;
 }
-.toggle-check { display: none; }
+.toggle-check {
+  display: none;
+}
 .toggle-box {
   width: 32px;
   height: 18px;
@@ -361,20 +478,28 @@ function onHeightChange(e) {
   flex-shrink: 0;
 }
 .toggle-box::after {
-  content: '';
+  content: "";
   position: absolute;
-  top: 2px; left: 2px;
-  width: 14px; height: 14px;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: white;
   transition: transform 0.15s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-.toggle-check:checked ~ .toggle-box { background: var(--accent); }
-.toggle-check:checked ~ .toggle-box::after { transform: translateX(14px); }
+.toggle-check:checked ~ .toggle-box {
+  background: var(--accent);
+}
+.toggle-check:checked ~ .toggle-box::after {
+  transform: translateX(14px);
+}
 
 /* Sliders */
-.slider-row { margin-bottom: 14px; }
+.slider-row {
+  margin-bottom: 14px;
+}
 .slider-header {
   display: flex;
   align-items: center;
@@ -410,14 +535,17 @@ function onHeightChange(e) {
 }
 .slider::-webkit-slider-thumb {
   appearance: none;
-  width: 16px; height: 16px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 1px 4px rgba(78,124,246,0.4);
+  box-shadow: 0 1px 4px rgba(78, 124, 246, 0.4);
   cursor: pointer;
   transition: transform 0.1s;
 }
-.slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
 .slider-temp {
   background: linear-gradient(to right, #a8c8f8, #e0e0e0 50%, #f8c8a0);
 }
@@ -453,11 +581,20 @@ function onHeightChange(e) {
   color: white;
   font-weight: 500;
   font-size: 13px;
-  transition: background 0.12s, opacity 0.12s;
+  transition:
+    background 0.12s,
+    opacity 0.12s;
 }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.45; cursor: default; }
-.btn-full { width: 100%; }
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn-full {
+  width: 100%;
+}
 
 .btn-secondary {
   flex: 1;
@@ -470,9 +607,14 @@ function onHeightChange(e) {
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 13px;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
 
 .btn-ghost {
   display: flex;
@@ -483,10 +625,18 @@ function onHeightChange(e) {
   color: var(--text-tertiary);
   font-size: 12px;
   font-weight: 500;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.btn-ghost:hover { background: var(--bg-hover); color: var(--text-secondary); }
-.btn-sm { padding: 6px 10px; font-size: 12px; }
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 12px;
+}
 
 /* Empty state */
 .empty-panel {
@@ -502,15 +652,22 @@ function onHeightChange(e) {
   padding: 40px 20px;
   border-bottom: none;
 }
-.empty-icon { color: var(--text-tertiary); }
+.empty-icon {
+  color: var(--text-tertiary);
+}
 
 /* Spinner */
 .spinner-sm {
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,0.4);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>
