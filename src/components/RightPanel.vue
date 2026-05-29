@@ -360,13 +360,12 @@ function onHeightChange(e) {
 
 <style scoped>
 .right-panel {
-  width: var(--panel-w);
   background: var(--bg-surface);
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .panel-section {

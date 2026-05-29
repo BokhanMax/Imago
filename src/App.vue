@@ -5,10 +5,12 @@ import TopBar from "./components/TopBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import CanvasArea from "./components/CanvasArea.vue";
 import RightPanel from "./components/RightPanel.vue";
+import LayersPanel from "./components/LayersPanel.vue";
 import ExportModal from "./components/ExportModal.vue";
 import { useHistory } from "./composables/useHistory.js";
+import { useLayers } from "./composables/useLayers.js";
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
 
 onMounted(() => {
   document.documentElement.lang = locale.value;
@@ -35,6 +37,58 @@ const colorSaturation = ref(0);
 
 const { push, undo, redo, clear, canUndo, canRedo } = useHistory(24);
 
+// ── Layers ────────────────────────────────────────────────────────────────────
+const {
+  layers,
+  activeId,
+  activeLayer,
+  addFromImage,
+  addEmpty,
+  removeLayer,
+  moveUp,
+  moveDown,
+  setActive,
+  toggleVisible,
+  toggleLock,
+  bumpVersion,
+  clearAll: clearLayers,
+  getSnapshot: getLayersSnapshot,
+  restoreSnapshot: restoreLayersSnapshot,
+} = useLayers();
+
+// Signal CanvasArea to re-composite (after visibility/order changes)
+const recompositeSignal = ref(0);
+
+function addLayer() {
+  const name = t("layers.layerName", { n: layers.value.length + 1 });
+  addEmpty(name);
+  // New layer is transparent — no recomposite needed visually
+}
+
+function removeActiveLayer() {
+  removeLayer(activeId.value);
+  recompositeSignal.value++;
+}
+
+function moveActiveLayerUp() {
+  moveUp(activeId.value);
+  recompositeSignal.value++;
+}
+
+function moveActiveLayerDown() {
+  moveDown(activeId.value);
+  recompositeSignal.value++;
+}
+
+function toggleLayerVisible(id) {
+  toggleVisible(id);
+  recompositeSignal.value++;
+}
+
+function toggleLayerLock(id) {
+  toggleLock(id);
+}
+
 function setTool(tool) {
   if (!hasImage.value) return;
   if (currentTool.value === tool) {
@@ -56,8 +110,13 @@ async function performUndo() {
   const snap = undo();
   if (snap) {
     await canvasAreaRef.value?.restoreSnapshot(snap);
-    resizeWidth.value = snap.width;
-    resizeHeight.value = snap.height;
+    const active =
+      snap.layerSnaps?.find((s) => s.id === snap.activeId) ??
+      snap.layerSnaps?.[0];
+    if (active) {
+      resizeWidth.value = active.w;
+      resizeHeight.value = active.h;
+    }
   }
 }
 
@@ -65,8 +124,13 @@ async function performRedo() {
   const snap = redo();
   if (snap) {
     await canvasAreaRef.value?.restoreSnapshot(snap);
-    resizeWidth.value = snap.width;
-    resizeHeight.value = snap.height;
+    const active =
+      snap.layerSnaps?.find((s) => s.id === snap.activeId) ??
+      snap.layerSnaps?.[0];
+    if (active) {
+      resizeWidth.value = active.w;
+      resizeHeight.value = active.h;
+    }
   }
 }
 
@@ -163,6 +227,7 @@ function onKeyDown(e) {
 provide(
   "editor",
   reactive({
+    // UI state
     currentTool,
     hasImage,
     isProcessing,
@@ -175,6 +240,16 @@ provide(
     resizeWidth,
     resizeHeight,
     resizeConstrain,
+    colorBrightness,
+    colorContrast,
+    colorTemperature,
+    colorSaturation,
+    // Layers state (refs/computed auto-unwrap inside reactive)
+    layers,
+    activeId,
+    activeLayer,
+    recompositeSignal,
+    // UI actions
     setTool,
     performUndo,
     performRedo,
@@ -183,10 +258,6 @@ provide(
     cancelCrop,
     applyBgRemove,
     applyResize,
-    colorBrightness,
-    colorContrast,
-    colorTemperature,
-    colorSaturation,
     applyColor,
     cancelColor,
     resetColorSliders,
@@ -194,6 +265,19 @@ provide(
     openExport: () => {
       showExport.value = true;
     },
+    // Layers actions
+    clearLayers,
+    addLayerFromImage: addFromImage,
+    addLayer,
+    removeActiveLayer,
+    moveActiveLayerUp,
+    moveActiveLayerDown,
+    setActiveLayer: setActive,
+    toggleLayerVisible,
+    toggleLayerLock,
+    bumpLayerVersion: bumpVersion,
+    getLayersSnapshot,
+    restoreLayersSnapshot,
   }),
 );
 </script>
@@ -210,7 +294,10 @@ provide(
         @processing="isProcessing = $event"
       />
       <Transition name="slide-right">
-        <RightPanel v-if="hasImage" />
+        <div v-if="hasImage" class="right-col">
+          <RightPanel />
+          <LayersPanel />
+        </div>
       </Transition>
     </main>
     <footer class="statusbar">
@@ -240,6 +327,14 @@ provide(
   flex: 1;
   overflow: hidden;
   position: relative;
+}
+.right-col {
+  width: var(--panel-w);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .statusbar {
   height: 22px;

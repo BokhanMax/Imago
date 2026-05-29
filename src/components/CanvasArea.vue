@@ -14,41 +14,68 @@ const mainCanvas = ref(null);
 const cropperImg = ref(null);
 const isCropping = ref(false);
 let cropper = null;
-let ctx = null;
 let isSpotPainting = ref(false);
 
-// Canvas display size (CSS pixels = canvas pixels * zoom)
-const displayWidth = computed(
-  () => (mainCanvas.value?.width ?? 0) * editor.zoom,
-);
-const displayHeight = computed(
-  () => (mainCanvas.value?.height ?? 0) * editor.zoom,
-);
+// Reactive doc dimensions (updated by recomposite)
+const docWidth = ref(0);
+const docHeight = ref(0);
 
-onMounted(() => {
-  ctx = mainCanvas.value.getContext("2d", { willReadFrequently: true });
-});
+// Canvas display size in CSS pixels
+const displayWidth = computed(() => docWidth.value * editor.zoom);
+const displayHeight = computed(() => docHeight.value * editor.zoom);
+
+// ── Active layer helpers ──────────────────────────────────────────────────────
+function getActiveCtx() {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return null;
+  return layer.canvas.getContext("2d", { willReadFrequently: true });
+}
+
+// ── Composite all visible layers → mainCanvas ─────────────────────────────────
+function recomposite() {
+  if (!mainCanvas.value || !editor.layers || !editor.layers.length) return;
+  const w = editor.layers[0].canvas.width;
+  const h = editor.layers[0].canvas.height;
+  docWidth.value = w;
+  docHeight.value = h;
+  if (mainCanvas.value.width !== w) mainCanvas.value.width = w;
+  if (mainCanvas.value.height !== h) mainCanvas.value.height = h;
+  const tCtx = mainCanvas.value.getContext("2d");
+  tCtx.clearRect(0, 0, w, h);
+  for (const layer of editor.layers) {
+    if (layer.visible) tCtx.drawImage(layer.canvas, 0, 0);
+  }
+}
+
+// Re-composite when App.vue signals a structural change (visibility, reorder)
+watch(
+  () => editor.recompositeSignal,
+  () => recomposite(),
+);
 
 // ── File loading ──────────────────────────────────────────────────────────────
 function loadFile(file) {
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    mainCanvas.value.width = img.width;
-    mainCanvas.value.height = img.height;
-    ctx.clearRect(0, 0, img.width, img.height);
-    ctx.drawImage(img, 0, 0);
+    const name = file.name.replace(/\.[^.]+$/, "") || t("layers.background");
+    editor.clearLayers();
+    editor.addLayerFromImage(img, name);
+    recomposite();
     URL.revokeObjectURL(url);
-    emit("image-loaded", { width: img.width, height: img.height });
+    emit("image-loaded", {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    });
   };
   img.src = url;
 }
 
 function fitToWindow() {
   const area = scrollArea.value;
-  if (!area || !mainCanvas.value) return;
-  const scaleX = (area.clientWidth - 64) / mainCanvas.value.width;
-  const scaleY = (area.clientHeight - 64) / mainCanvas.value.height;
+  if (!area || !docWidth.value || !docHeight.value) return;
+  const scaleX = (area.clientWidth - 64) / docWidth.value;
+  const scaleY = (area.clientHeight - 64) / docHeight.value;
   editor.setZoom(Math.min(1, Math.min(scaleX, scaleY)));
 }
 
@@ -56,16 +83,28 @@ function fitToWindow() {
 function activateTool(tool) {
   if (tool === "crop") initCropper();
   if (tool === "color") {
-    // Store original pixels for live preview / cancel
-    const c = mainCanvas.value;
-    colorOrigData = ctx.getImageData(0, 0, c.width, c.height);
+    const layer = editor.activeLayer;
+    if (!layer || layer.locked) return;
+    const lctx = getActiveCtx();
+    if (lctx) {
+      colorOrigData = lctx.getImageData(
+        0,
+        0,
+        layer.canvas.width,
+        layer.canvas.height,
+      );
+    }
   }
 }
 
 function cancelTool() {
   if (isCropping.value) destroyCropper();
   if (colorOrigData) {
-    ctx.putImageData(colorOrigData, 0, 0);
+    const lctx = getActiveCtx();
+    if (lctx) {
+      lctx.putImageData(colorOrigData, 0, 0);
+      recomposite();
+    }
     colorOrigData = null;
   }
 }
@@ -121,43 +160,29 @@ function applyColorPreview(brightness, contrast, temperature, saturation) {
   if (!colorOrigData) return;
   const copy = new Uint8ClampedArray(colorOrigData.data);
   applyColorFilter(copy, brightness, contrast, temperature, saturation);
-  ctx.putImageData(
+  const lctx = getActiveCtx();
+  if (!lctx) return;
+  lctx.putImageData(
     new ImageData(copy, colorOrigData.width, colorOrigData.height),
     0,
     0,
   );
+  recomposite();
 }
 
 function commitColor() {
-  // Canvas already shows the filtered result — just discard saved original
   colorOrigData = null;
+  if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+  recomposite();
 }
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
 function getSnapshot() {
-  return new Promise((resolve) => {
-    const c = mainCanvas.value;
-    c.toBlob(
-      (blob) => resolve({ blob, width: c.width, height: c.height }),
-      "image/png",
-    );
-  });
+  return editor.getLayersSnapshot();
 }
 
 function restoreSnapshot(snap) {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(snap.blob);
-    const img = new Image();
-    img.onload = () => {
-      mainCanvas.value.width = snap.width;
-      mainCanvas.value.height = snap.height;
-      ctx.clearRect(0, 0, snap.width, snap.height);
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    img.src = url;
-  });
+  return editor.restoreLayersSnapshot(snap).then(() => recomposite());
 }
 
 // ── Crop tool ─────────────────────────────────────────────────────────────────
@@ -195,13 +220,19 @@ function destroyCropper() {
 
 function applyCrop() {
   if (!cropper) return;
-  const cropped = cropper.getCroppedCanvas();
-  mainCanvas.value.width = cropped.width;
-  mainCanvas.value.height = cropped.height;
-  ctx.clearRect(0, 0, cropped.width, cropped.height);
-  ctx.drawImage(cropped, 0, 0);
+  // getData(true) rounds coords to integers — same rect applied to all layers
+  const data = cropper.getData(true);
+  for (const layer of editor.layers) {
+    const tmp = document.createElement("canvas");
+    tmp.width = data.width;
+    tmp.height = data.height;
+    tmp.getContext("2d").drawImage(layer.canvas, -data.x, -data.y);
+    layer.canvas = tmp;
+    layer.version++;
+  }
   destroyCropper();
-  emit("action-complete", { width: cropped.width, height: cropped.height });
+  recomposite();
+  emit("action-complete", { width: data.width, height: data.height });
 }
 
 // Watch aspect ratio changes while crop is active
@@ -217,8 +248,10 @@ async function applyBgRemove() {
   emit("processing", true);
   try {
     const { removeBackground } = await import("@imgly/background-removal");
+    const layer = editor.activeLayer;
+    if (!layer) return;
     const blob = await new Promise((resolve) =>
-      mainCanvas.value.toBlob(resolve, "image/png"),
+      layer.canvas.toBlob(resolve, "image/png"),
     );
     const resultBlob = await removeBackground(blob);
     const url = URL.createObjectURL(resultBlob);
@@ -228,15 +261,18 @@ async function applyBgRemove() {
       img.onerror = reject;
       img.src = url;
     });
-    mainCanvas.value.width = img.width;
-    mainCanvas.value.height = img.height;
-    ctx.clearRect(0, 0, img.width, img.height);
-    ctx.drawImage(img, 0, 0);
+    const newCanvas = document.createElement("canvas");
+    newCanvas.width = img.width;
+    newCanvas.height = img.height;
+    newCanvas.getContext("2d").drawImage(img, 0, 0);
+    layer.canvas = newCanvas;
+    layer.version++;
     URL.revokeObjectURL(url);
+    recomposite();
     emit("action-complete", { width: img.width, height: img.height });
   } catch (err) {
     console.error("Background removal failed:", err);
-    alert("Не удалось убрать фон. Проверьте подключение к сети.");
+    alert("Не вдалося прибрати фон. Перевірте з'єднання з мережею.");
   } finally {
     emit("processing", false);
   }
@@ -244,17 +280,18 @@ async function applyBgRemove() {
 
 // ── Resize ────────────────────────────────────────────────────────────────────
 function applyResize(newW, newH) {
-  const c = mainCanvas.value;
-  const tmp = document.createElement("canvas");
-  tmp.width = newW;
-  tmp.height = newH;
-  const tmpCtx = tmp.getContext("2d");
-  tmpCtx.imageSmoothingEnabled = true;
-  tmpCtx.imageSmoothingQuality = "high";
-  tmpCtx.drawImage(c, 0, 0, newW, newH);
-  c.width = newW;
-  c.height = newH;
-  ctx.drawImage(tmp, 0, 0);
+  for (const layer of editor.layers) {
+    const tmp = document.createElement("canvas");
+    tmp.width = newW;
+    tmp.height = newH;
+    const tmpCtx = tmp.getContext("2d");
+    tmpCtx.imageSmoothingEnabled = true;
+    tmpCtx.imageSmoothingQuality = "high";
+    tmpCtx.drawImage(layer.canvas, 0, 0, newW, newH);
+    layer.canvas = tmp;
+    layer.version++;
+  }
+  recomposite();
   emit("action-complete", { width: newW, height: newH });
 }
 
@@ -265,8 +302,8 @@ let healStarted = false;
 
 function getCanvasCoords(e) {
   const rect = mainCanvas.value.getBoundingClientRect();
-  const scaleX = mainCanvas.value.width / rect.width;
-  const scaleY = mainCanvas.value.height / rect.height;
+  const scaleX = docWidth.value / rect.width;
+  const scaleY = docHeight.value / rect.height;
   return {
     x: Math.round((e.clientX - rect.left) * scaleX),
     y: Math.round((e.clientY - rect.top) * scaleY),
@@ -288,13 +325,11 @@ function onCanvasMouseMove(e) {
   if (!healStarted || editor.currentTool !== "spot") return;
   e.preventDefault();
   const { x, y } = getCanvasCoords(e);
-  // Interpolate between last and current point for smooth strokes
   if (lastHealX !== null) {
     const steps = Math.max(
       1,
       Math.ceil(
-        Math.hypot(x - lastHealX, y - lastHealY) /
-          (editor.spotSize.value * 0.4),
+        Math.hypot(x - lastHealX, y - lastHealY) / (editor.spotSize * 0.4),
       ),
     );
     for (let i = 1; i <= steps; i++) {
@@ -315,13 +350,20 @@ function onCanvasMouseUp() {
   isSpotPainting.value = false;
   lastHealX = null;
   lastHealY = null;
+  // Bump version so LayersPanel thumbnail updates after stroke ends
+  if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
 }
 
 function healAt(cx, cy) {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return;
+  const lctx = getActiveCtx();
+  if (!lctx) return;
+
   const r = Math.max(2, editor.spotSize);
   const strength = editor.spotStrength;
-  const cw = mainCanvas.value.width;
-  const ch = mainCanvas.value.height;
+  const cw = layer.canvas.width;
+  const ch = layer.canvas.height;
 
   const x0 = Math.max(0, cx - Math.ceil(r * 2));
   const y0 = Math.max(0, cy - Math.ceil(r * 2));
@@ -331,10 +373,10 @@ function healAt(cx, cy) {
   const h = y1 - y0;
   if (w <= 0 || h <= 0) return;
 
-  const imageData = ctx.getImageData(x0, y0, w, h);
+  const imageData = lctx.getImageData(x0, y0, w, h);
   const src = imageData.data;
 
-  // Compute average color of surrounding ring (r..r*1.6)
+  // Compute average color of surrounding ring (innerR..outerR)
   const innerR = r;
   const outerR = r * 1.6;
   let rSum = 0,
@@ -361,7 +403,7 @@ function healAt(cx, cy) {
     avgB = bSum / count,
     avgA = aSum / count;
 
-  // Blend inner brush area toward average
+  // Blend inner brush area toward ring average
   const dst = new Uint8ClampedArray(src);
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
@@ -376,13 +418,15 @@ function healAt(cx, cy) {
       dst[i + 3] = src[i + 3] * (1 - f) + avgA * f;
     }
   }
-  ctx.putImageData(new ImageData(dst, w, h), x0, y0);
+  lctx.putImageData(new ImageData(dst, w, h), x0, y0);
+  recomposite();
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
 function exportImage({ format, quality }) {
   const mime = format === "jpg" ? "image/jpeg" : "image/png";
   const q = format === "jpg" ? quality / 100 : undefined;
+  recomposite(); // ensure all visible layers are composited
   const dataUrl = mainCanvas.value.toDataURL(mime, q);
   const a = document.createElement("a");
   a.download = `imago-export.${format}`;
