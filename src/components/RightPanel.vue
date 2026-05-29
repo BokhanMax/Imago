@@ -7,6 +7,19 @@ const editor = inject("editor");
 
 const tool = computed(() => editor.currentTool);
 
+const systemFonts = [
+  "Arial",
+  "Verdana",
+  "Trebuchet MS",
+  "Georgia",
+  "Times New Roman",
+  "Courier New",
+  "Impact",
+  "Tahoma",
+  "Comic Sans MS",
+  "Helvetica",
+];
+
 const aspectOptions = computed(() => [
   { label: t("crop.free"), value: NaN },
   { label: "1 : 1", value: 1 },
@@ -327,6 +340,133 @@ function onHeightChange(e) {
         </button>
         <button class="btn-primary" @click="editor.applyColor">
           {{ t("color.apply") }}
+        </button>
+      </div>
+    </template>
+
+    <!-- Text Panel -->
+    <template v-else-if="tool === 'text'">
+      <div class="panel-section">
+        <div class="section-title">{{ t("text.title") }}</div>
+
+        <!-- Text content -->
+        <textarea
+          class="text-input"
+          :placeholder="t('text.placeholder')"
+          v-model="editor.textContent"
+          rows="3"
+          spellcheck="false"
+        />
+
+        <!-- Font family -->
+        <div class="field-row" style="margin-top: 12px">
+          <label class="field-label">{{ t("text.font") }}</label>
+          <select class="font-select" v-model="editor.textFont">
+            <option
+              v-for="f in systemFonts"
+              :key="f"
+              :value="f"
+              :style="{ fontFamily: f }"
+            >
+              {{ f }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Font size -->
+        <div class="field-row">
+          <label class="field-label">{{ t("text.size") }}</label>
+          <div class="field-input-wrap">
+            <input
+              type="number"
+              class="field-input"
+              v-model.number="editor.textSize"
+              min="8"
+              max="400"
+            />
+            <span class="field-unit">px</span>
+          </div>
+        </div>
+
+        <!-- Color -->
+        <div class="field-row">
+          <label class="field-label">{{ t("text.color") }}</label>
+          <input type="color" class="color-pick" v-model="editor.textColor" />
+        </div>
+
+        <!-- Style toggles: B / I / U / S -->
+        <div class="style-row">
+          <button
+            class="style-btn"
+            :class="{ active: editor.textBold }"
+            :title="t('text.bold')"
+            @click="editor.textBold = !editor.textBold"
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            class="style-btn style-italic"
+            :class="{ active: editor.textItalic }"
+            :title="t('text.italic')"
+            @click="editor.textItalic = !editor.textItalic"
+          >
+            <em>I</em>
+          </button>
+          <button
+            class="style-btn"
+            :class="{ active: editor.textUnderline }"
+            :title="t('text.underline')"
+            @click="editor.textUnderline = !editor.textUnderline"
+          >
+            <span class="style-u">U</span>
+          </button>
+          <button
+            class="style-btn"
+            :class="{ active: editor.textStrikethrough }"
+            :title="t('text.strikethrough')"
+            @click="editor.textStrikethrough = !editor.textStrikethrough"
+          >
+            <span class="style-s">S</span>
+          </button>
+        </div>
+
+        <!-- Position hint -->
+        <p class="hint-text hint-pos">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            style="flex-shrink: 0"
+          >
+            <circle
+              cx="6"
+              cy="6"
+              r="5"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
+            <path
+              d="M6 4v4M4 6h4"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linecap="round"
+            />
+          </svg>
+          {{ editor.textPos ? t("text.clickToMove") : t("text.clickHint") }}
+        </p>
+      </div>
+
+      <div class="panel-actions">
+        <button class="btn-secondary" @click="editor.cancelText">
+          {{ t("text.cancel") }}
+        </button>
+        <button
+          class="btn-primary"
+          :disabled="!editor.textContent || !editor.textPos"
+          @click="editor.applyText"
+        >
+          {{ t("text.apply") }}
         </button>
       </div>
     </template>
@@ -668,5 +808,100 @@ function onHeightChange(e) {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Text tool ────────────────────────────────────────────────── */
+.text-input {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  box-sizing: border-box;
+  transition: border-color 0.12s;
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.font-select {
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  max-width: 148px;
+}
+.font-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.color-pick {
+  width: 36px;
+  height: 26px;
+  padding: 2px 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: none;
+  cursor: pointer;
+}
+
+.style-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.style-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 14px;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+.style-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.style-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+.style-italic {
+  font-style: italic;
+}
+.style-u {
+  text-decoration: underline;
+}
+.style-s {
+  text-decoration: line-through;
+}
+
+.hint-pos {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
 }
 </style>

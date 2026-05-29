@@ -31,6 +31,41 @@ function getActiveCtx() {
   return layer.canvas.getContext("2d", { willReadFrequently: true });
 }
 
+// ── Text helpers ──────────────────────────────────────────────────────────────
+function buildFontString() {
+  const parts = [];
+  if (editor.textItalic) parts.push("italic");
+  if (editor.textBold) parts.push("bold");
+  parts.push(`${editor.textSize}px`);
+  parts.push(`"${editor.textFont}", sans-serif`);
+  return parts.join(" ");
+}
+
+function drawTextOnCtx(ctx, text, x, y) {
+  if (!text) return;
+  ctx.save();
+  ctx.font = buildFontString();
+  ctx.fillStyle = editor.textColor;
+  ctx.textBaseline = "top";
+  const lines = text.split("\n");
+  const lineHeight = editor.textSize * 1.25;
+  const lineThick = Math.max(1, Math.round(editor.textSize / 15));
+  lines.forEach((line, i) => {
+    const ly = y + i * lineHeight;
+    ctx.fillText(line, x, ly);
+    if (line) {
+      const w = ctx.measureText(line).width;
+      if (editor.textUnderline) {
+        ctx.fillRect(x, ly + editor.textSize + 2, w, lineThick);
+      }
+      if (editor.textStrikethrough) {
+        ctx.fillRect(x, ly + editor.textSize * 0.55, w, lineThick);
+      }
+    }
+  });
+  ctx.restore();
+}
+
 // ── Composite all visible layers → mainCanvas ─────────────────────────────────
 function recomposite() {
   if (!mainCanvas.value || !editor.layers || !editor.layers.length) return;
@@ -45,12 +80,35 @@ function recomposite() {
   for (const layer of editor.layers) {
     if (layer.visible) tCtx.drawImage(layer.canvas, 0, 0);
   }
+  // Draw live text preview on top of composite (not baked into any layer)
+  if (editor.currentTool === "text" && editor.textPos && editor.textContent) {
+    drawTextOnCtx(tCtx, editor.textContent, editor.textPos.x, editor.textPos.y);
+  }
 }
 
 // Re-composite when App.vue signals a structural change (visibility, reorder)
 watch(
   () => editor.recompositeSignal,
   () => recomposite(),
+);
+
+// Re-composite whenever any text property changes (live preview)
+watch(
+  () => [
+    editor.textContent,
+    editor.textSize,
+    editor.textColor,
+    editor.textBold,
+    editor.textItalic,
+    editor.textUnderline,
+    editor.textStrikethrough,
+    editor.textFont,
+    editor.textPos?.x,
+    editor.textPos?.y,
+  ],
+  () => {
+    if (editor.currentTool === "text") recomposite();
+  },
 );
 
 // ── File loading ──────────────────────────────────────────────────────────────
@@ -95,6 +153,9 @@ function activateTool(tool) {
       );
     }
   }
+  if (tool === "text") {
+    editor.textPos = null;
+  }
 }
 
 function cancelTool() {
@@ -106,6 +167,10 @@ function cancelTool() {
       recomposite();
     }
     colorOrigData = null;
+  }
+  if (editor.textPos !== null) {
+    editor.textPos = null;
+    recomposite();
   }
 }
 
@@ -174,6 +239,22 @@ function commitColor() {
   colorOrigData = null;
   if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
   recomposite();
+}
+
+// ── Text tool ─────────────────────────────────────────────────────────────────
+function applyText() {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return;
+  if (!editor.textPos || !editor.textContent) return;
+  const lctx = layer.canvas.getContext("2d");
+  drawTextOnCtx(lctx, editor.textContent, editor.textPos.x, editor.textPos.y);
+  layer.version++;
+  editor.textPos = null;
+  recomposite();
+  emit("action-complete", {
+    width: layer.canvas.width,
+    height: layer.canvas.height,
+  });
 }
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
@@ -311,7 +392,16 @@ function getCanvasCoords(e) {
 }
 
 function onCanvasMouseDown(e) {
-  if (editor.currentTool !== "spot" || isCropping.value) return;
+  if (isCropping.value) return;
+
+  if (editor.currentTool === "text") {
+    e.preventDefault();
+    const { x, y } = getCanvasCoords(e);
+    editor.textPos = { x, y };
+    return;
+  }
+
+  if (editor.currentTool !== "spot") return;
   e.preventDefault();
   healStarted = true;
   isSpotPainting.value = true;
@@ -478,6 +568,7 @@ defineExpose({
   applyResize,
   applyColorPreview,
   commitColor,
+  applyText,
   getSnapshot,
   restoreSnapshot,
   exportImage,
@@ -545,7 +636,10 @@ defineExpose({
           v-show="!isCropping"
           ref="mainCanvas"
           class="main-canvas"
-          :class="{ 'cursor-spot': editor.currentTool === 'spot' }"
+          :class="{
+            'cursor-spot': editor.currentTool === 'spot',
+            'cursor-text-tool': editor.currentTool === 'text',
+          }"
           :style="{ width: displayWidth + 'px', height: displayHeight + 'px' }"
           @mousedown="onCanvasMouseDown"
           @mousemove="onCanvasMouseMove"
@@ -665,6 +759,10 @@ defineExpose({
 
 .cursor-spot {
   cursor: crosshair;
+}
+
+.cursor-text-tool {
+  cursor: text;
 }
 
 /* Cropper wrap */

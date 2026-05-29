@@ -59,6 +59,13 @@ const tools = [
       <circle cx="9" cy="12" r="1.4" fill="currentColor" opacity="0.7"/>
     </svg>`,
   },
+  {
+    id: "text",
+    icon: `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M3 4.5h12M9 4.5V14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M6 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>`,
+  },
 ];
 </script>
 

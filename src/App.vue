@@ -35,6 +35,17 @@ const colorContrast = ref(0);
 const colorTemperature = ref(0);
 const colorSaturation = ref(0);
 
+// Text tool state
+const textContent = ref("");
+const textSize = ref(48);
+const textColor = ref("#000000");
+const textBold = ref(false);
+const textItalic = ref(false);
+const textUnderline = ref(false);
+const textStrikethrough = ref(false);
+const textFont = ref("Arial");
+const textPos = ref(null); // { x, y } in canvas pixel space, set by click
+
 const { push, undo, redo, clear, canUndo, canRedo } = useHistory(24);
 
 // ── Layers ────────────────────────────────────────────────────────────────────
@@ -193,6 +204,14 @@ function cancelColor() {
   currentTool.value = "move";
 }
 
+function applyText() {
+  canvasAreaRef.value?.applyText();
+}
+function cancelText() {
+  canvasAreaRef.value?.cancelTool();
+  currentTool.value = "move";
+}
+
 watch(
   [colorBrightness, colorContrast, colorTemperature, colorSaturation],
   () => {
@@ -244,6 +263,16 @@ provide(
     colorContrast,
     colorTemperature,
     colorSaturation,
+    // Text tool state
+    textContent,
+    textSize,
+    textColor,
+    textBold,
+    textItalic,
+    textUnderline,
+    textStrikethrough,
+    textFont,
+    textPos,
     // Layers state (refs/computed auto-unwrap inside reactive)
     layers,
     activeId,
@@ -261,6 +290,8 @@ provide(
     applyColor,
     cancelColor,
     resetColorSliders,
+    applyText,
+    cancelText,
     setZoom,
     openExport: () => {
       showExport.value = true;
@@ -301,7 +332,7 @@ provide(
       </Transition>
     </main>
     <footer class="statusbar">
-      <span>© Max Bokhan, 2026</span>
+      <span> © Max Bokhan, 2026 | ver. 0.0.2 </span>
     </footer>
     <Transition name="fade">
       <ExportModal
