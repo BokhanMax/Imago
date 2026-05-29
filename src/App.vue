@@ -1,11 +1,18 @@
 <script setup>
-import { ref, provide, reactive, nextTick, watch } from "vue";
+import { ref, provide, reactive, nextTick, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import TopBar from "./components/TopBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import CanvasArea from "./components/CanvasArea.vue";
 import RightPanel from "./components/RightPanel.vue";
 import ExportModal from "./components/ExportModal.vue";
 import { useHistory } from "./composables/useHistory.js";
+
+const { locale } = useI18n();
+
+onMounted(() => {
+  document.documentElement.lang = locale.value;
+});
 
 const canvasAreaRef = ref(null);
 const currentTool = ref("move");
