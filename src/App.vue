@@ -35,6 +35,10 @@ const colorContrast = ref(0);
 const colorTemperature = ref(0);
 const colorSaturation = ref(0);
 
+// Filter tool state
+const activeFilter = ref("normal");
+const filterThumbnail = ref(null);
+
 // Text tool state
 const textContent = ref("");
 const textSize = ref(48);
@@ -225,6 +229,29 @@ watch(
     }
   },
 );
+
+// Capture thumbnail + init preview when filter tool activates
+watch(currentTool, async (tool) => {
+  if (tool === "filter") {
+    await nextTick();
+    filterThumbnail.value = canvasAreaRef.value?.getFilterThumbnail() ?? null;
+    activeFilter.value = "normal";
+  }
+});
+
+function applyFilterPreview(name) {
+  activeFilter.value = name;
+  canvasAreaRef.value?.applyFilterPreview(name);
+}
+async function applyFilter() {
+  canvasAreaRef.value?.commitFilter();
+  currentTool.value = "move";
+  await saveSnapshot();
+}
+function cancelFilter() {
+  canvasAreaRef.value?.cancelFilterPreview();
+  currentTool.value = "move";
+}
 function setZoom(v) {
   zoom.value = Math.min(8, Math.max(0.1, v));
 }
@@ -273,6 +300,9 @@ provide(
     textStrikethrough,
     textFont,
     textPos,
+    // Filter tool state
+    activeFilter,
+    filterThumbnail,
     // Layers state (refs/computed auto-unwrap inside reactive)
     layers,
     activeId,
@@ -292,6 +322,9 @@ provide(
     resetColorSliders,
     applyText,
     cancelText,
+    applyFilterPreview,
+    applyFilter,
+    cancelFilter,
     setZoom,
     openExport: () => {
       showExport.value = true;

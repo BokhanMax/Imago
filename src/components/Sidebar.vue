@@ -66,6 +66,15 @@ const tools = [
       <path d="M6 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
     </svg>`,
   },
+  {
+    id: "filter",
+    icon: `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1.2"/>
+      <rect x="10" y="2" width="6" height="6" rx="1" fill="currentColor" opacity="0.4" stroke="currentColor" stroke-width="1.2"/>
+      <rect x="2" y="10" width="6" height="6" rx="1" fill="currentColor" opacity="0.7" stroke="currentColor" stroke-width="1.2"/>
+      <rect x="10" y="10" width="6" height="6" rx="1" fill="currentColor" opacity="1" stroke="currentColor" stroke-width="1.2"/>
+    </svg>`,
+  },
 ];
 </script>
 

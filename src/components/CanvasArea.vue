@@ -153,6 +153,7 @@ function activateTool(tool) {
       );
     }
   }
+  if (tool === "filter") initFilterPreview();
   if (tool === "text") {
     editor.textPos = null;
   }
@@ -168,10 +169,240 @@ function cancelTool() {
     }
     colorOrigData = null;
   }
+  if (filterOrigData) {
+    cancelFilterPreview();
+  }
   if (editor.textPos !== null) {
     editor.textPos = null;
     recomposite();
   }
+}
+
+// ── Filter presets ───────────────────────────────────────────────────────────
+const FILTER_PRESETS = {
+  normal: {
+    mode: "standard",
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    temperature: 0,
+    vignette: 0,
+  },
+  bw: {
+    mode: "bw",
+    brightness: 0,
+    contrast: 8,
+    saturation: 0,
+    temperature: 0,
+    vignette: 0,
+  },
+  sepia: {
+    mode: "sepia",
+    brightness: 0,
+    contrast: 8,
+    saturation: 0,
+    temperature: 0,
+    vignette: 0,
+  },
+  vivid: {
+    mode: "standard",
+    brightness: 3,
+    contrast: 28,
+    saturation: 55,
+    temperature: 0,
+    vignette: 0,
+  },
+  fade: {
+    mode: "standard",
+    brightness: 18,
+    contrast: -22,
+    saturation: -28,
+    temperature: 0,
+    vignette: 0,
+  },
+  cool: {
+    mode: "standard",
+    brightness: 0,
+    contrast: 6,
+    saturation: 8,
+    temperature: -38,
+    vignette: 0,
+  },
+  warm: {
+    mode: "standard",
+    brightness: 0,
+    contrast: 5,
+    saturation: 12,
+    temperature: 38,
+    vignette: 0,
+  },
+  drama: {
+    mode: "standard",
+    brightness: -8,
+    contrast: 48,
+    saturation: 18,
+    temperature: 0,
+    vignette: 35,
+  },
+  vintage: {
+    mode: "sepia",
+    brightness: -5,
+    contrast: 12,
+    saturation: -20,
+    temperature: 15,
+    vignette: 40,
+  },
+  chrome: {
+    mode: "standard",
+    brightness: 8,
+    contrast: 38,
+    saturation: -18,
+    temperature: -12,
+    vignette: 18,
+  },
+};
+
+let filterOrigData = null;
+
+function getFilterThumbnail() {
+  if (!mainCanvas.value) return null;
+  const maxSize = 72;
+  const w = mainCanvas.value.width;
+  const h = mainCanvas.value.height;
+  const scale = Math.min(maxSize / w, maxSize / h, 1);
+  const tw = Math.round(w * scale);
+  const th = Math.round(h * scale);
+  const thumb = document.createElement("canvas");
+  thumb.width = tw;
+  thumb.height = th;
+  thumb.getContext("2d").drawImage(mainCanvas.value, 0, 0, tw, th);
+  return thumb.toDataURL("image/jpeg", 0.82);
+}
+
+function applyFilterData(data, preset) {
+  const {
+    mode = "standard",
+    brightness = 0,
+    contrast = 0,
+    saturation = 0,
+    temperature = 0,
+  } = preset;
+  const cFactor =
+    contrast === 0 ? 1 : (259 * (contrast + 255)) / (255 * (259 - contrast));
+  const bShift = (brightness / 100) * 128;
+  const tR = temperature * 0.4;
+  const tB = -temperature * 0.4;
+  const sFactor = 1 + saturation / 100;
+
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+
+    if (mode === "bw") {
+      const l = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = g = b = l;
+    } else if (mode === "sepia") {
+      const nr = 0.393 * r + 0.769 * g + 0.189 * b;
+      const ng = 0.349 * r + 0.686 * g + 0.168 * b;
+      const nb = 0.272 * r + 0.534 * g + 0.131 * b;
+      r = nr;
+      g = ng;
+      b = nb;
+    }
+
+    r += bShift;
+    g += bShift;
+    b += bShift;
+    r = cFactor * (r - 128) + 128;
+    g = cFactor * (g - 128) + 128;
+    b = cFactor * (b - 128) + 128;
+    r += tR;
+    b += tB;
+
+    if (mode !== "bw") {
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = lum + (r - lum) * sFactor;
+      g = lum + (g - lum) * sFactor;
+      b = lum + (b - lum) * sFactor;
+    }
+
+    data[i] = Math.max(0, Math.min(255, r));
+    data[i + 1] = Math.max(0, Math.min(255, g));
+    data[i + 2] = Math.max(0, Math.min(255, b));
+  }
+}
+
+function applyVignetteToCtx(ctx, w, h, strength) {
+  const grad = ctx.createRadialGradient(
+    w / 2,
+    h / 2,
+    0,
+    w / 2,
+    h / 2,
+    Math.sqrt(w * w + h * h) / 2,
+  );
+  const alpha = (strength / 100) * 0.88;
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(0.45, "rgba(0,0,0,0)");
+  grad.addColorStop(1, `rgba(0,0,0,${alpha})`);
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+function initFilterPreview() {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return;
+  const lctx = getActiveCtx();
+  if (lctx)
+    filterOrigData = lctx.getImageData(
+      0,
+      0,
+      layer.canvas.width,
+      layer.canvas.height,
+    );
+}
+
+function applyFilterPreview(filterName) {
+  if (!filterOrigData) return;
+  const preset = FILTER_PRESETS[filterName];
+  if (!preset) return;
+  const copy = new Uint8ClampedArray(filterOrigData.data);
+  applyFilterData(copy, preset);
+  const lctx = getActiveCtx();
+  if (!lctx) return;
+  lctx.putImageData(
+    new ImageData(copy, filterOrigData.width, filterOrigData.height),
+    0,
+    0,
+  );
+  if (preset.vignette > 0)
+    applyVignetteToCtx(
+      lctx,
+      filterOrigData.width,
+      filterOrigData.height,
+      preset.vignette,
+    );
+  recomposite();
+}
+
+function commitFilter() {
+  filterOrigData = null;
+  if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+  recomposite();
+}
+
+function cancelFilterPreview() {
+  if (!filterOrigData) return;
+  const lctx = getActiveCtx();
+  if (lctx) {
+    lctx.putImageData(filterOrigData, 0, 0);
+    recomposite();
+  }
+  filterOrigData = null;
 }
 
 // ── Color Correction ─────────────────────────────────────────────────────────
@@ -572,6 +803,10 @@ defineExpose({
   getSnapshot,
   restoreSnapshot,
   exportImage,
+  getFilterThumbnail,
+  applyFilterPreview,
+  commitFilter,
+  cancelFilterPreview,
 });
 </script>
 

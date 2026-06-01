@@ -28,6 +28,33 @@ const aspectOptions = computed(() => [
   { label: "16 : 9", value: 16 / 9 },
 ]);
 
+// ── Filter data ───────────────────────────────────────────────────────────────
+const filterNames = [
+  "normal",
+  "bw",
+  "sepia",
+  "vivid",
+  "fade",
+  "cool",
+  "warm",
+  "drama",
+  "vintage",
+  "chrome",
+];
+
+const filterCss = {
+  normal: "none",
+  bw: "grayscale(100%) contrast(108%)",
+  sepia: "sepia(85%) contrast(108%)",
+  vivid: "saturate(155%) contrast(128%) brightness(103%)",
+  fade: "brightness(118%) contrast(78%) saturate(72%)",
+  cool: "hue-rotate(-25deg) saturate(108%) contrast(106%)",
+  warm: "hue-rotate(12deg) saturate(112%) brightness(105%) contrast(105%)",
+  drama: "contrast(148%) saturate(118%) brightness(92%)",
+  vintage: "sepia(30%) contrast(112%) brightness(95%) saturate(80%)",
+  chrome: "grayscale(18%) contrast(138%) brightness(108%) saturate(82%)",
+};
+
 function setAspect(val) {
   editor.cropAspect = val;
 }
@@ -472,6 +499,41 @@ function onHeightChange(e) {
     </template>
 
     <!-- Move / default panel -->
+    <template v-else-if="tool === 'filter'">
+      <div class="panel-section">
+        <div class="section-title">{{ t("filter.title") }}</div>
+        <div class="filter-grid">
+          <button
+            v-for="name in filterNames"
+            :key="name"
+            class="filter-btn"
+            :class="{ active: editor.activeFilter === name }"
+            @click="editor.applyFilterPreview(name)"
+          >
+            <div class="filter-thumb-wrap" :style="{ filter: filterCss[name] }">
+              <img
+                v-if="editor.filterThumbnail"
+                :src="editor.filterThumbnail"
+                class="filter-thumb-img"
+                draggable="false"
+              />
+              <div v-else class="filter-thumb-placeholder" />
+            </div>
+            <span class="filter-name">{{ t("filter." + name) }}</span>
+          </button>
+        </div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn-secondary" @click="editor.cancelFilter">
+          {{ t("filter.cancel") }}
+        </button>
+        <button class="btn-primary" @click="editor.applyFilter">
+          {{ t("filter.apply") }}
+        </button>
+      </div>
+    </template>
+
+    <!-- Move / default panel -->
     <template v-else>
       <div class="panel-section empty-panel">
         <div class="empty-icon">
@@ -903,5 +965,63 @@ function onHeightChange(e) {
   margin-top: 12px;
   color: var(--text-tertiary);
   line-height: 1.4;
+}
+
+/* ── Filter panel ─────────────────────────────────────────────────────────── */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.filter-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.filter-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.filter-btn.active {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+
+.filter-thumb-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ddd;
+}
+.filter-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+.filter-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #d0d0d8 0%, #b8b8c4 100%);
+}
+
+.filter-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
 }
 </style>
