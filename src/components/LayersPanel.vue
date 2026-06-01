@@ -253,6 +253,7 @@ const canMoveDown = computed(() => {
             alt=""
             draggable="false"
           />
+          <span v-if="layer.type === 'text'" class="layer-type-badge">T</span>
         </div>
 
         <!-- Name -->
@@ -398,6 +399,7 @@ const canMoveDown = computed(() => {
   border-radius: 3px;
   overflow: hidden;
   border: 1px solid var(--border);
+  position: relative;
   /* Checkerboard for transparency */
   background-image:
     linear-gradient(45deg, #e0e0e8 25%, transparent 25%),
@@ -418,6 +420,21 @@ const canMoveDown = computed(() => {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.layer-type-badge {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 2px;
+  padding: 1px 2px;
+  pointer-events: none;
+  user-select: none;
 }
 
 .layer-name {

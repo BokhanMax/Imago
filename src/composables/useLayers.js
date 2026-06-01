@@ -49,6 +49,22 @@ export function useLayers() {
     return layer;
   }
 
+  // Add a new text layer (canvas is transparent; content rendered from textData)
+  function addTextLayer(name) {
+    const base = layers.value[0];
+    const w = base?.canvas.width ?? 800;
+    const h = base?.canvas.height ?? 600;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const layer = makeLayer(c, name);
+    layer.type = "text";
+    layer.textData = null;
+    layers.value.push(layer);
+    activeId.value = layer.id;
+    return layer;
+  }
+
   function removeLayer(id) {
     if (layers.value.length <= 1) return;
     const idx = layers.value.findIndex((l) => l.id === id);
@@ -122,6 +138,8 @@ export function useLayers() {
                 blob,
                 w: l.canvas.width,
                 h: l.canvas.height,
+                type: l.type ?? null,
+                textData: l.textData ? { ...l.textData } : null,
               });
             }, "image/png");
           }),
@@ -149,7 +167,10 @@ export function useLayers() {
                 0,
               );
               URL.revokeObjectURL(url);
-              resolve(makeLayer(c, s.name, s.id, s.visible, s.locked));
+              const layer = makeLayer(c, s.name, s.id, s.visible, s.locked);
+              if (s.type) layer.type = s.type;
+              if (s.textData) layer.textData = { ...s.textData };
+              resolve(layer);
             };
             img.src = url;
           }),
@@ -165,6 +186,7 @@ export function useLayers() {
     activeLayer,
     addFromImage,
     addEmpty,
+    addTextLayer,
     removeLayer,
     moveUp,
     moveDown,

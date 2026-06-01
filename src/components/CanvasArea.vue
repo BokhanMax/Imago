@@ -32,38 +32,63 @@ function getActiveCtx() {
 }
 
 // ── Text helpers ──────────────────────────────────────────────────────────────
-function buildFontString() {
+function buildFontString(d) {
   const parts = [];
-  if (editor.textItalic) parts.push("italic");
-  if (editor.textBold) parts.push("bold");
-  parts.push(`${editor.textSize}px`);
-  parts.push(`"${editor.textFont}", sans-serif`);
+  if (d.italic) parts.push("italic");
+  if (d.bold) parts.push("bold");
+  parts.push(`${d.size}px`);
+  parts.push(`"${d.font}", sans-serif`);
   return parts.join(" ");
 }
 
-function drawTextOnCtx(ctx, text, x, y) {
-  if (!text) return;
+// Draw text described by a data object onto ctx
+function drawTextOnCtx(ctx, d) {
+  if (!d.content) return;
   ctx.save();
-  ctx.font = buildFontString();
-  ctx.fillStyle = editor.textColor;
+  ctx.font = buildFontString(d);
+  ctx.fillStyle = d.color;
   ctx.textBaseline = "top";
-  const lines = text.split("\n");
-  const lineHeight = editor.textSize * 1.25;
-  const lineThick = Math.max(1, Math.round(editor.textSize / 15));
+  const lines = d.content.split("\n");
+  const lineHeight = d.size * 1.25;
+  const lineThick = Math.max(1, Math.round(d.size / 15));
   lines.forEach((line, i) => {
-    const ly = y + i * lineHeight;
-    ctx.fillText(line, x, ly);
+    const ly = d.y + i * lineHeight;
+    ctx.fillText(line, d.x, ly);
     if (line) {
       const w = ctx.measureText(line).width;
-      if (editor.textUnderline) {
-        ctx.fillRect(x, ly + editor.textSize + 2, w, lineThick);
+      if (d.underline) {
+        ctx.fillRect(d.x, ly + d.size + 2, w, lineThick);
       }
-      if (editor.textStrikethrough) {
-        ctx.fillRect(x, ly + editor.textSize * 0.55, w, lineThick);
+      if (d.strikethrough) {
+        ctx.fillRect(d.x, ly + d.size * 0.55, w, lineThick);
       }
     }
   });
   ctx.restore();
+}
+
+// Re-render a text layer's own canvas from its textData
+function renderTextLayer(layer) {
+  const { width, height } = layer.canvas;
+  const ctx = layer.canvas.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, width, height);
+  if (layer.textData) drawTextOnCtx(ctx, layer.textData);
+}
+
+// Build text data from the current editor text-tool state
+function editorTextData() {
+  return {
+    content: editor.textContent,
+    x: editor.textPos.x,
+    y: editor.textPos.y,
+    size: editor.textSize,
+    color: editor.textColor,
+    font: editor.textFont,
+    bold: editor.textBold,
+    italic: editor.textItalic,
+    underline: editor.textUnderline,
+    strikethrough: editor.textStrikethrough,
+  };
 }
 
 // ── Composite all visible layers → mainCanvas ─────────────────────────────────
@@ -77,12 +102,26 @@ function recomposite() {
   if (mainCanvas.value.height !== h) mainCanvas.value.height = h;
   const tCtx = mainCanvas.value.getContext("2d");
   tCtx.clearRect(0, 0, w, h);
+  // The text layer being actively edited is skipped — live preview replaces it
+  const editingTextId =
+    editor.currentTool === "text" && editor.textPos ? editor.activeId : null;
   for (const layer of editor.layers) {
-    if (layer.visible) tCtx.drawImage(layer.canvas, 0, 0);
+    if (!layer.visible) continue;
+    if (layer.type === "text") {
+      if (layer.id === editingTextId) continue;
+      // If this text layer is currently being moved, draw it at the offset position
+      if (layerMoveActive && layer.id === editor.activeId && layer.textData) {
+        const td = { ...layer.textData, x: layer.textData.x + layerMoveDx, y: layer.textData.y + layerMoveDy };
+        drawTextOnCtx(tCtx, td);
+        continue;
+      }
+      renderTextLayer(layer);
+    }
+    tCtx.drawImage(layer.canvas, 0, 0);
   }
   // Draw live text preview on top of composite (not baked into any layer)
   if (editor.currentTool === "text" && editor.textPos && editor.textContent) {
-    drawTextOnCtx(tCtx, editor.textContent, editor.textPos.x, editor.textPos.y);
+    drawTextOnCtx(tCtx, editorTextData());
   }
   nextTick(drawRulers);
 }
@@ -171,7 +210,22 @@ function activateTool(tool) {
   }
   if (tool === "filter") initFilterPreview();
   if (tool === "text") {
-    editor.textPos = null;
+    const layer = editor.activeLayer;
+    if (layer?.type === "text" && layer.textData) {
+      // Load existing text data into editor state for editing
+      const td = layer.textData;
+      editor.textContent = td.content;
+      editor.textSize = td.size;
+      editor.textColor = td.color;
+      editor.textFont = td.font;
+      editor.textBold = td.bold;
+      editor.textItalic = td.italic;
+      editor.textUnderline = td.underline;
+      editor.textStrikethrough = td.strikethrough;
+      editor.textPos = { x: td.x, y: td.y };
+    } else {
+      editor.textPos = null;
+    }
   }
 }
 
@@ -490,18 +544,36 @@ function commitColor() {
 
 // ── Text tool ─────────────────────────────────────────────────────────────────
 function applyText() {
-  const layer = editor.activeLayer;
-  if (!layer || layer.locked) return;
   if (!editor.textPos || !editor.textContent) return;
-  const lctx = layer.canvas.getContext("2d");
-  drawTextOnCtx(lctx, editor.textContent, editor.textPos.x, editor.textPos.y);
-  layer.version++;
-  editor.textPos = null;
-  recomposite();
-  emit("action-complete", {
-    width: layer.canvas.width,
-    height: layer.canvas.height,
-  });
+  const td = editorTextData();
+  const active = editor.activeLayer;
+
+  if (active?.type === "text") {
+    // Update existing text layer
+    if (active.locked) return;
+    active.textData = td;
+    renderTextLayer(active);
+    active.version++;
+    editor.textPos = null;
+    recomposite();
+    emit("action-complete", {
+      width: active.canvas.width,
+      height: active.canvas.height,
+    });
+  } else {
+    // Create a new text layer
+    const name = td.content.slice(0, 20).replace(/\n/g, " ") || "Text";
+    editor.textPos = null;
+    const layer = editor.addTextLayer(name);
+    layer.textData = td;
+    renderTextLayer(layer);
+    layer.version++;
+    recomposite();
+    emit("action-complete", {
+      width: layer.canvas.width,
+      height: layer.canvas.height,
+    });
+  }
 }
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
@@ -643,6 +715,8 @@ const guideCanvas = ref(null);
 let layerMoveActive = false;
 let layerMoveStartX = 0;
 let layerMoveStartY = 0;
+let layerMoveDx = 0;        // current snapped delta (used by recomposite for text layers)
+let layerMoveDy = 0;
 let layerOrigData = null;   // ImageData backup
 let layerBBox = null;       // { l, t, r, b, w, h } bounding box of non-transparent content
 
@@ -799,10 +873,15 @@ function onCanvasMouseMove(e) {
     const { dx, dy, guideXs, guideYs } = computeSnap(rawDx, rawDy);
     const layer = editor.activeLayer;
     if (!layer || !layerOrigData) return;
-    const { width, height } = layer.canvas;
-    const lctx = layer.canvas.getContext('2d', { willReadFrequently: true });
-    lctx.clearRect(0, 0, width, height);
-    lctx.putImageData(layerOrigData, dx, dy);
+    layerMoveDx = dx;
+    layerMoveDy = dy;
+    if (layer.type !== 'text') {
+      // Pixel layers: physically shift pixels in canvas
+      const { width, height } = layer.canvas;
+      const lctx = layer.canvas.getContext('2d', { willReadFrequently: true });
+      lctx.clearRect(0, 0, width, height);
+      lctx.putImageData(layerOrigData, dx, dy);
+    }
     recomposite();
     drawGuides(guideXs, guideYs);
     return;
@@ -833,6 +912,14 @@ function onCanvasMouseMove(e) {
 function onCanvasMouseUp() {
   if (layerMoveActive) {
     layerMoveActive = false;
+    const layer = editor.activeLayer;
+    // For text layers: commit the offset into textData and re-render canvas
+    if (layer?.type === 'text' && layer.textData) {
+      layer.textData = { ...layer.textData, x: layer.textData.x + layerMoveDx, y: layer.textData.y + layerMoveDy };
+      renderTextLayer(layer);
+    }
+    layerMoveDx = 0;
+    layerMoveDy = 0;
     layerOrigData = null;
     layerBBox = null;
     clearGuides();
