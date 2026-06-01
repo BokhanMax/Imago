@@ -1,6 +1,7 @@
 export default {
   topbar: {
     open: "Відкрити",
+    create: "Новий",
     export: "Експорт",
     zoomOut: "Зменшити масштаб",
     zoomIn: "Збільшити масштаб",
@@ -86,6 +87,19 @@ export default {
   },
   move: {
     hint: "Виберіть інструмент на панелі зліва",
+  },
+  create: {
+    title: "Новий холст",
+    width: "Ширина",
+    height: "Висота",
+    px: "пкс",
+    background: "Фон",
+    bgWhite: "Білий",
+    bgTransparent: "Прозорий",
+    groupInternet: "Популярні — Інтернет",
+    groupPrint: "Популярні — Друк",
+    cancel: "Скасувати",
+    create: "Створити",
   },
   layers: {
     title: "Шари",

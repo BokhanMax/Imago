@@ -10,6 +10,10 @@ function openFile() {
   fileInput.value.click();
 }
 
+function openCreate() {
+  editor.openCreate();
+}
+
 function onFileSelected(e) {
   const file = e.target.files[0];
   if (file) editor.loadFile(file);
@@ -139,6 +143,14 @@ function fitZoom() {
       </div>
 
       <div class="divider" v-if="editor.hasImage" />
+
+      <button class="btn-ghost" @click="openCreate">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+          <path d="M7 4.5v5M4.5 7h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        {{ t("topbar.create") }}
+      </button>
 
       <button class="btn-ghost" @click="openFile">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

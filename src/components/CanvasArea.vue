@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, inject, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import Cropper from "cropperjs";
 import "cropperjs/dist/cropper.css";
@@ -84,6 +84,7 @@ function recomposite() {
   if (editor.currentTool === "text" && editor.textPos && editor.textContent) {
     drawTextOnCtx(tCtx, editor.textContent, editor.textPos.x, editor.textPos.y);
   }
+  nextTick(drawRulers);
 }
 
 // Re-composite when App.vue signals a structural change (visibility, reorder)
@@ -127,6 +128,21 @@ function loadFile(file) {
     });
   };
   img.src = url;
+}
+
+function createBlank(width, height, background) {
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
+  if (background === "white") {
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+  }
+  editor.clearLayers();
+  editor.addLayerFromImage(c, t("layers.background"));
+  recomposite();
+  emit("image-loaded", { width, height });
 }
 
 function fitToWindow() {
@@ -775,10 +791,12 @@ function onWheel(e) {
 onMounted(() => {
   window.addEventListener("mouseup", onCanvasMouseUp);
   window.addEventListener("wheel", onWheel, { passive: false });
+  window.addEventListener("resize", drawRulers);
 });
 onUnmounted(() => {
   window.removeEventListener("mouseup", onCanvasMouseUp);
   window.removeEventListener("wheel", onWheel);
+  window.removeEventListener("resize", drawRulers);
   if (cropper) cropper.destroy();
 });
 
@@ -789,8 +807,175 @@ function onDrop(e) {
   if (file && file.type.startsWith("image/")) loadFile(file);
 }
 
+// ── Rulers ───────────────────────────────────────────────────────────────────
+const rulerH = ref(null);
+const rulerV = ref(null);
+const RULER_PX = 20;
+
+watch(() => editor.zoom, () => nextTick(drawRulers));
+
+function rulerStep(zoom) {
+  const steps = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+  for (const s of steps) if (s * zoom >= 60) return s;
+  return 5000;
+}
+
+function drawRulers() {
+  if (!editor.hasImage || !scrollArea.value || !mainCanvas.value) return;
+  const area = scrollArea.value;
+  const cvs  = mainCanvas.value;
+  const zoom  = editor.zoom;
+  const dpr   = window.devicePixelRatio || 1;
+  const step  = rulerStep(zoom);
+
+  // Read theme colors from CSS variables so rulers match any theme
+  const cs = getComputedStyle(document.documentElement);
+  const colors = {
+    bg:        cs.getPropertyValue('--bg-elevated').trim()    || '#fafafa',
+    tick:      cs.getPropertyValue('--border-strong').trim()  || 'rgba(0,0,0,.14)',
+    tickMinor: cs.getPropertyValue('--border').trim()         || 'rgba(0,0,0,.08)',
+    label:     cs.getPropertyValue('--text-secondary').trim() || '#6b6b80',
+    accent:    cs.getPropertyValue('--accent').trim()         || '#4e7cf6',
+  };
+
+  const cRect = cvs.getBoundingClientRect();
+  const aRect = area.getBoundingClientRect();
+  // Canvas origin in the scroll-content coordinate system
+  const ox = cRect.left - aRect.left + area.scrollLeft;
+  const oy = cRect.top  - aRect.top  + area.scrollTop;
+
+  // ── Horizontal ──
+  const rh = rulerH.value;
+  if (rh) {
+    const W = area.clientWidth;
+    rh.width  = W * dpr;  rh.height = RULER_PX * dpr;
+    rh.style.width  = W + 'px'; rh.style.height = RULER_PX + 'px';
+    const ctx = rh.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rulerDrawH(ctx, W, RULER_PX, ox - area.scrollLeft, zoom, step, docWidth.value, colors);
+  }
+
+  // ── Vertical ──
+  const rv = rulerV.value;
+  if (rv) {
+    const H = area.clientHeight;
+    rv.width  = RULER_PX * dpr; rv.height = H * dpr;
+    rv.style.width  = RULER_PX + 'px'; rv.style.height = H + 'px';
+    const ctx = rv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rulerDrawV(ctx, RULER_PX, H, oy - area.scrollTop, zoom, step, docHeight.value, colors);
+  }
+}
+
+function rulerDrawH(ctx, W, H, startX, zoom, step, docPx, colors) {
+  ctx.fillStyle = colors.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Highlight: canvas extent
+  const l = Math.max(0, startX), r = Math.min(W, startX + docPx * zoom);
+  if (r > l) {
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = colors.accent;
+    ctx.fillRect(l, H - 2, r - l, 2);
+    ctx.globalAlpha = 1;
+  }
+
+  const minP = Math.floor(-startX / zoom / step) * step;
+  const maxP = Math.ceil((W - startX) / zoom / step) * step + step;
+
+  ctx.font = '9px system-ui,sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+
+  for (let p = minP; p <= maxP; p += step) {
+    const x = Math.round(startX + p * zoom) + 0.5;
+    if (x < -1 || x > W + 1) continue;
+
+    ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x, H - 8);
+    ctx.strokeStyle = colors.tick; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = colors.label; ctx.fillText(String(p), x, 2);
+
+    // Minor ticks (/4)
+    const ms = step / 4;
+    if (ms * zoom >= 5) {
+      for (let j = 1; j < 4; j++) {
+        const mx = Math.round(startX + (p + j * ms) * zoom) + 0.5;
+        if (mx < 0 || mx > W) continue;
+        ctx.beginPath(); ctx.moveTo(mx, H); ctx.lineTo(mx, H - 4);
+        ctx.strokeStyle = colors.tickMinor; ctx.stroke();
+      }
+    }
+  }
+
+  // Canvas edge lines
+  for (const ex of [startX, startX + docPx * zoom]) {
+    if (ex < 0 || ex > W) continue;
+    const x = Math.round(ex) + 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H);
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = colors.accent; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function rulerDrawV(ctx, W, H, startY, zoom, step, docPx, colors) {
+  ctx.fillStyle = colors.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const t = Math.max(0, startY), b = Math.min(H, startY + docPx * zoom);
+  if (b > t) {
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = colors.accent;
+    ctx.fillRect(W - 2, t, 2, b - t);
+    ctx.globalAlpha = 1;
+  }
+
+  const minP = Math.floor(-startY / zoom / step) * step;
+  const maxP = Math.ceil((H - startY) / zoom / step) * step + step;
+
+  ctx.font = '9px system-ui,sans-serif';
+
+  for (let p = minP; p <= maxP; p += step) {
+    const y = Math.round(startY + p * zoom) + 0.5;
+    if (y < -1 || y > H + 1) continue;
+
+    ctx.beginPath(); ctx.moveTo(W, y); ctx.lineTo(W - 8, y);
+    ctx.strokeStyle = colors.tick; ctx.lineWidth = 1; ctx.stroke();
+
+    // Rotated label
+    ctx.save();
+    ctx.translate(W - 10, y);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = colors.label;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(p), 0, 0);
+    ctx.restore();
+
+    const ms = step / 4;
+    if (ms * zoom >= 5) {
+      for (let j = 1; j < 4; j++) {
+        const my = Math.round(startY + (p + j * ms) * zoom) + 0.5;
+        if (my < 0 || my > H) continue;
+        ctx.beginPath(); ctx.moveTo(W, my); ctx.lineTo(W - 4, my);
+        ctx.strokeStyle = colors.tickMinor; ctx.stroke();
+      }
+    }
+  }
+
+  for (const ey of [startY, startY + docPx * zoom]) {
+    if (ey < 0 || ey > H) continue;
+    const y = Math.round(ey) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y);
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = colors.accent; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
 defineExpose({
   loadFile,
+  createBlank,
   fitToWindow,
   activateTool,
   cancelTool,
@@ -812,6 +997,11 @@ defineExpose({
 
 <template>
   <div class="canvas-area">
+    <!-- Ruler corner + rulers (visible only when image is loaded) -->
+    <div v-show="editor.hasImage" class="ruler-corner" />
+    <canvas v-show="editor.hasImage" ref="rulerH" class="ruler-h" />
+    <canvas v-show="editor.hasImage" ref="rulerV" class="ruler-v" />
+
     <!-- Drop zone -->
     <div
       v-if="!editor.hasImage"
@@ -859,7 +1049,7 @@ defineExpose({
     </div>
 
     <!-- Canvas workspace -->
-    <div v-show="editor.hasImage" class="scroll-area" ref="scrollArea">
+    <div v-show="editor.hasImage" class="scroll-area" ref="scrollArea" @scroll="drawRulers">
       <div class="canvas-padding">
         <!-- Cropper mode -->
         <div v-show="isCropping" class="cropper-wrap">
@@ -897,15 +1087,44 @@ defineExpose({
 <style scoped>
 .canvas-area {
   flex: 1;
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  grid-template-rows: 20px 1fr;
   position: relative;
   overflow: hidden;
   background: var(--bg-app);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Rulers */
+.ruler-corner {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  z-index: 2;
+}
+.ruler-h {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+  border-bottom: 1px solid var(--border-strong);
+  z-index: 2;
+}
+.ruler-v {
+  grid-column: 1;
+  grid-row: 2;
+  display: block;
+  border-right: 1px solid var(--border-strong);
+  z-index: 2;
 }
 
 /* Drop zone */
 .drop-zone {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
   flex: 1;
   display: flex;
   align-items: center;
@@ -956,9 +1175,12 @@ defineExpose({
 
 /* Scroll area */
 .scroll-area {
-  flex: 1;
+  grid-column: 2;
+  grid-row: 2;
   overflow: auto;
   display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
 .canvas-padding {

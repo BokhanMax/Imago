@@ -7,6 +7,7 @@ import CanvasArea from "./components/CanvasArea.vue";
 import RightPanel from "./components/RightPanel.vue";
 import LayersPanel from "./components/LayersPanel.vue";
 import ExportModal from "./components/ExportModal.vue";
+import CreateModal from "./components/CreateModal.vue";
 import { useHistory } from "./composables/useHistory.js";
 import { useLayers } from "./composables/useLayers.js";
 
@@ -22,6 +23,7 @@ const hasImage = ref(false);
 const isProcessing = ref(false);
 const zoom = ref(1);
 const showExport = ref(false);
+const showCreate = ref(false);
 
 const cropAspect = ref(NaN);
 const spotSize = ref(20);
@@ -151,6 +153,11 @@ async function performRedo() {
 
 function loadFile(file) {
   canvasAreaRef.value?.loadFile(file);
+}
+
+async function createNew({ width, height, background }) {
+  showCreate.value = false;
+  canvasAreaRef.value?.createBlank(width, height, background);
 }
 
 async function onImageLoaded(dims) {
@@ -313,6 +320,7 @@ provide(
     performUndo,
     performRedo,
     loadFile,
+    openCreate: () => { showCreate.value = true; },
     applyCrop,
     cancelCrop,
     applyBgRemove,
@@ -372,6 +380,13 @@ provide(
         v-if="showExport"
         @close="showExport = false"
         @export="exportImage"
+      />
+    </Transition>
+    <Transition name="fade">
+      <CreateModal
+        v-if="showCreate"
+        @close="showCreate = false"
+        @create="createNew"
       />
     </Transition>
   </div>

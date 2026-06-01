@@ -1,6 +1,7 @@
 export default {
   topbar: {
     open: "Open",
+    create: "New",
     export: "Export",
     zoomOut: "Zoom out",
     zoomIn: "Zoom in",
@@ -114,6 +115,19 @@ export default {
   },
   move: {
     hint: "Select a tool from the left panel",
+  },
+  create: {
+    title: "New Canvas",
+    width: "Width",
+    height: "Height",
+    px: "px",
+    background: "Background",
+    bgWhite: "White",
+    bgTransparent: "Transparent",
+    groupInternet: "Popular — Internet",
+    groupPrint: "Popular — Print",
+    cancel: "Cancel",
+    create: "Create",
   },
   export: {
     title: "Export Image",
