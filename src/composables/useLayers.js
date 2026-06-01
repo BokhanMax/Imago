@@ -91,6 +91,11 @@ export function useLayers() {
     if (l) l.locked = !l.locked;
   }
 
+  function renameLayer(id, name) {
+    const l = layers.value.find((l) => l.id === id);
+    if (l && name.trim()) l.name = name.trim();
+  }
+
   // Increment version counter so LayersPanel thumbnails react to pixel changes
   function bumpVersion(id) {
     const l = layers.value.find((l) => l.id === id);
@@ -166,6 +171,7 @@ export function useLayers() {
     setActive,
     toggleVisible,
     toggleLock,
+    renameLayer,
     bumpVersion,
     clearAll,
     getSnapshot,

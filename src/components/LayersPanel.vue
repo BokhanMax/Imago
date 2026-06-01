@@ -1,9 +1,37 @@
 <script setup>
-import { inject, computed } from "vue";
+import { inject, computed, ref, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const editor = inject("editor");
+
+// Inline rename state
+const editingId = ref(null);
+const editingName = ref("");
+
+function startRename(layer) {
+  editingId.value = layer.id;
+  editingName.value = layer.name;
+  nextTick(() => {
+    document.getElementById("layer-rename-" + layer.id)?.select();
+  });
+}
+
+function commitRename() {
+  if (editingId.value !== null) {
+    editor.renameLayer(editingId.value, editingName.value);
+    editingId.value = null;
+  }
+}
+
+function onRenameKeydown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    e.target.blur(); // blur triggers commitRename
+  } else if (e.key === "Escape") {
+    editingId.value = null; // hide without saving; blur will fire but editingId is null → no-op
+  }
+}
 
 // Display reversed: top of list = top render layer (highest index)
 const reversedLayers = computed(() => [...(editor.layers ?? [])].reverse());
@@ -228,7 +256,21 @@ const canMoveDown = computed(() => {
         </div>
 
         <!-- Name -->
-        <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
+        <input
+          v-if="editingId === layer.id"
+          :id="'layer-rename-' + layer.id"
+          class="layer-name-input"
+          v-model="editingName"
+          @blur="commitRename"
+          @keydown="onRenameKeydown"
+          @click.stop
+        />
+        <span
+          v-else
+          class="layer-name"
+          :title="layer.name"
+          @dblclick.stop="startRename(layer)"
+        >{{ layer.name }}</span>
       </div>
     </div>
   </aside>
@@ -390,5 +432,19 @@ const canMoveDown = computed(() => {
 }
 .layer-item.locked .layer-name {
   color: var(--text-tertiary);
+}
+
+.layer-name-input {
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs);
+  outline: none;
+  padding: 0 4px;
+  height: 20px;
+  flex: 1;
+  min-width: 0;
 }
 </style>
