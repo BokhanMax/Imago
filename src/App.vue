@@ -13,6 +13,8 @@ import { useLayers } from "./composables/useLayers.js";
 
 const { locale, t } = useI18n();
 
+const appVersion = __APP_VERSION__;
+
 onMounted(() => {
   document.documentElement.lang = locale.value;
 });
@@ -375,7 +377,7 @@ provide(
       </Transition>
     </main>
     <footer class="statusbar">
-      <span> © Max Bokhan, 2026 | ver. 0.0.2 </span>
+      <span> © Max Bokhan, 2026 | ver. {{ appVersion }} </span>
     </footer>
     <Transition name="fade">
       <ExportModal
