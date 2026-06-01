@@ -973,6 +973,36 @@ function rulerDrawV(ctx, W, H, startY, zoom, step, docPx, colors) {
   }
 }
 
+// ── Fill tool ───────────────────────────────────────────────────────────────────────────────
+function applyFill({ mode, color, color1, color2, angle }) {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return;
+  const { width, height } = layer.canvas;
+  const ctx = layer.canvas.getContext('2d', { willReadFrequently: true });
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  if (mode === 'solid') {
+    ctx.fillStyle = color;
+  } else {
+    const rad = (angle * Math.PI) / 180;
+    const cx = width / 2, cy = height / 2;
+    const len = Math.sqrt(width * width + height * height) / 2;
+    const grad = ctx.createLinearGradient(
+      cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
+      cx + Math.cos(rad) * len, cy + Math.sin(rad) * len,
+    );
+    grad.addColorStop(0, color1);
+    grad.addColorStop(1, color2);
+    ctx.fillStyle = grad;
+  }
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+  layer.version++;
+  recomposite();
+  emit('action-complete', { width, height });
+}
+
 defineExpose({
   loadFile,
   createBlank,
@@ -985,6 +1015,7 @@ defineExpose({
   applyColorPreview,
   commitColor,
   applyText,
+  applyFill,
   getSnapshot,
   restoreSnapshot,
   exportImage,

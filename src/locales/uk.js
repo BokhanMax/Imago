@@ -88,7 +88,20 @@ export default {
   move: {
     hint: "Виберіть інструмент на панелі зліва",
   },
-  create: {
+  fill: {
+    title: "Заливка шару",
+    solid: "Суцільна",
+    gradient: "Градієнт",
+    color: "Колір",
+    from: "Від",
+    to: "До",
+    angle: "Кут",
+    dirH: "→",
+    dirV: "↓",
+    dirD1: "↘",
+    dirD2: "↗",
+    apply: "Застосувати заливку",
+  },  create: {
     title: "Новий холст",
     width: "Ширина",
     height: "Висота",

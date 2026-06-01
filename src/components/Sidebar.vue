@@ -75,6 +75,14 @@ const tools = [
       <rect x="10" y="10" width="6" height="6" rx="1" fill="currentColor" opacity="1" stroke="currentColor" stroke-width="1.2"/>
     </svg>`,
   },
+  {
+    id: "fill",
+    icon: `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M3 13.5L10 3l5 7H3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M3 13.5h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M15.5 12c0 1-.7 1.8-1.5 1.8s-1.5-.8-1.5-1.8c0-.7 1.5-2.3 1.5-2.3S15.5 11.3 15.5 12z" fill="currentColor"/>
+    </svg>`,
+  },
 ];
 </script>
 

@@ -43,6 +43,13 @@ const colorSaturation = ref(0);
 const activeFilter = ref("normal");
 const filterThumbnail = ref(null);
 
+// Fill tool state
+const fillMode = ref("solid");   // 'solid' | 'gradient'
+const fillColor = ref("#4e7cf6");
+const fillColor1 = ref("#4e7cf6");
+const fillColor2 = ref("#ffffff");
+const fillAngle = ref(90);
+
 // Text tool state
 const textContent = ref("");
 const textSize = ref(48);
@@ -262,6 +269,18 @@ function cancelFilter() {
   canvasAreaRef.value?.cancelFilterPreview();
   currentTool.value = "move";
 }
+
+async function applyFill() {
+  canvasAreaRef.value?.applyFill({
+    mode: fillMode.value,
+    color: fillColor.value,
+    color1: fillColor1.value,
+    color2: fillColor2.value,
+    angle: fillAngle.value,
+  });
+  currentTool.value = "move";
+  await saveSnapshot();
+}
 function setZoom(v) {
   zoom.value = Math.min(8, Math.max(0.1, v));
 }
@@ -313,6 +332,12 @@ provide(
     // Filter tool state
     activeFilter,
     filterThumbnail,
+    // Fill tool state
+    fillMode,
+    fillColor,
+    fillColor1,
+    fillColor2,
+    fillAngle,
     // Layers state (refs/computed auto-unwrap inside reactive)
     layers,
     activeId,
@@ -336,6 +361,7 @@ provide(
     applyFilterPreview,
     applyFilter,
     cancelFilter,
+    applyFill,
     setZoom,
     openExport: () => {
       showExport.value = true;

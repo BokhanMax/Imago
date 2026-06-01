@@ -534,6 +534,78 @@ function onHeightChange(e) {
     </template>
 
     <!-- Move / default panel -->
+    <template v-else-if="tool === 'fill'">
+      <div class="panel-section">
+        <div class="section-title">{{ t("fill.title") }}</div>
+
+        <!-- Mode toggle -->
+        <div class="fill-mode-toggle">
+          <button
+            class="fill-mode-btn"
+            :class="{ active: editor.fillMode === 'solid' }"
+            @click="editor.fillMode = 'solid'"
+          >{{ t("fill.solid") }}</button>
+          <button
+            class="fill-mode-btn"
+            :class="{ active: editor.fillMode === 'gradient' }"
+            @click="editor.fillMode = 'gradient'"
+          >{{ t("fill.gradient") }}</button>
+        </div>
+
+        <!-- Solid -->
+        <template v-if="editor.fillMode === 'solid'">
+          <div class="field-row" style="margin-top: 12px">
+            <label class="field-label">{{ t("fill.color") }}</label>
+            <input type="color" class="color-pick" v-model="editor.fillColor" />
+          </div>
+          <div class="fill-solid-preview" :style="{ background: editor.fillColor }" />
+        </template>
+
+        <!-- Gradient -->
+        <template v-else>
+          <div class="field-row" style="margin-top: 12px">
+            <label class="field-label">{{ t("fill.from") }}</label>
+            <input type="color" class="color-pick" v-model="editor.fillColor1" />
+          </div>
+          <div class="field-row">
+            <label class="field-label">{{ t("fill.to") }}</label>
+            <input type="color" class="color-pick" v-model="editor.fillColor2" />
+          </div>
+          <div class="fill-grad-preview"
+            :style="{ background: `linear-gradient(${editor.fillAngle}deg, ${editor.fillColor1}, ${editor.fillColor2})` }"
+          />
+          <div class="field-row">
+            <label class="field-label">{{ t("fill.angle") }}</label>
+            <div class="fill-angle-wrap">
+              <div class="fill-dir-btns">
+                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 90 }"  @click="editor.fillAngle = 90">→</button>
+                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 180 }" @click="editor.fillAngle = 180">↓</button>
+                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 135 }" @click="editor.fillAngle = 135">↘</button>
+                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 45 }"  @click="editor.fillAngle = 45">↗</button>
+              </div>
+              <div class="field-input-wrap">
+                <input
+                  type="number"
+                  class="field-input"
+                  v-model.number="editor.fillAngle"
+                  min="0"
+                  max="360"
+                />
+                <span class="field-unit">°</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="panel-actions">
+        <button class="btn-primary btn-full" @click="editor.applyFill">
+          {{ t("fill.apply") }}
+        </button>
+      </div>
+    </template>
+
+    <!-- Move / default panel -->
     <template v-else>
       <div class="panel-section empty-panel">
         <div class="empty-icon">
@@ -1023,5 +1095,76 @@ function onHeightChange(e) {
   color: var(--text-secondary);
   text-align: center;
   white-space: nowrap;
+}
+
+/* ── Fill panel ───────────────────────────────────────────────────────────── */
+.fill-mode-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.fill-mode-btn {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 12px;
+  font-family: inherit;
+  border: none;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.fill-mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.fill-solid-preview {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin-top: 10px;
+}
+.fill-grad-preview {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.fill-angle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.fill-dir-btns {
+  display: flex;
+  gap: 3px;
+}
+.fill-dir-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.fill-dir-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.fill-dir-btn:hover:not(.active) {
+  border-color: var(--accent);
 }
 </style>

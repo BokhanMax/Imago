@@ -18,6 +18,7 @@ export default {
     color: "Color Correction",
     text: "Text",
     filter: "Filters",
+    fill: "Fill Layer",
   },
   dropzone: {
     title: "Drop image here",
@@ -115,6 +116,20 @@ export default {
   },
   move: {
     hint: "Select a tool from the left panel",
+  },
+  fill: {
+    title: "Fill Layer",
+    solid: "Solid",
+    gradient: "Gradient",
+    color: "Color",
+    from: "From",
+    to: "To",
+    angle: "Angle",
+    dirH: "→",
+    dirV: "↓",
+    dirD1: "↘",
+    dirD2: "↗",
+    apply: "Apply Fill",
   },
   create: {
     title: "New Canvas",
