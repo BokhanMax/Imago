@@ -544,12 +544,16 @@ function onHeightChange(e) {
             class="fill-mode-btn"
             :class="{ active: editor.fillMode === 'solid' }"
             @click="editor.fillMode = 'solid'"
-          >{{ t("fill.solid") }}</button>
+          >
+            {{ t("fill.solid") }}
+          </button>
           <button
             class="fill-mode-btn"
             :class="{ active: editor.fillMode === 'gradient' }"
             @click="editor.fillMode = 'gradient'"
-          >{{ t("fill.gradient") }}</button>
+          >
+            {{ t("fill.gradient") }}
+          </button>
         </div>
 
         <!-- Solid -->
@@ -558,30 +562,68 @@ function onHeightChange(e) {
             <label class="field-label">{{ t("fill.color") }}</label>
             <input type="color" class="color-pick" v-model="editor.fillColor" />
           </div>
-          <div class="fill-solid-preview" :style="{ background: editor.fillColor }" />
+          <div
+            class="fill-solid-preview"
+            :style="{ background: editor.fillColor }"
+          />
         </template>
 
         <!-- Gradient -->
         <template v-else>
           <div class="field-row" style="margin-top: 12px">
             <label class="field-label">{{ t("fill.from") }}</label>
-            <input type="color" class="color-pick" v-model="editor.fillColor1" />
+            <input
+              type="color"
+              class="color-pick"
+              v-model="editor.fillColor1"
+            />
           </div>
           <div class="field-row">
             <label class="field-label">{{ t("fill.to") }}</label>
-            <input type="color" class="color-pick" v-model="editor.fillColor2" />
+            <input
+              type="color"
+              class="color-pick"
+              v-model="editor.fillColor2"
+            />
           </div>
-          <div class="fill-grad-preview"
-            :style="{ background: `linear-gradient(${editor.fillAngle}deg, ${editor.fillColor1}, ${editor.fillColor2})` }"
+          <div
+            class="fill-grad-preview"
+            :style="{
+              background: `linear-gradient(${editor.fillAngle}deg, ${editor.fillColor1}, ${editor.fillColor2})`,
+            }"
           />
           <div class="field-row">
             <label class="field-label">{{ t("fill.angle") }}</label>
             <div class="fill-angle-wrap">
               <div class="fill-dir-btns">
-                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 90 }"  @click="editor.fillAngle = 90">→</button>
-                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 180 }" @click="editor.fillAngle = 180">↓</button>
-                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 135 }" @click="editor.fillAngle = 135">↘</button>
-                <button class="fill-dir-btn" :class="{ active: editor.fillAngle === 45 }"  @click="editor.fillAngle = 45">↗</button>
+                <button
+                  class="fill-dir-btn"
+                  :class="{ active: editor.fillAngle === 90 }"
+                  @click="editor.fillAngle = 90"
+                >
+                  →
+                </button>
+                <button
+                  class="fill-dir-btn"
+                  :class="{ active: editor.fillAngle === 180 }"
+                  @click="editor.fillAngle = 180"
+                >
+                  ↓
+                </button>
+                <button
+                  class="fill-dir-btn"
+                  :class="{ active: editor.fillAngle === 135 }"
+                  @click="editor.fillAngle = 135"
+                >
+                  ↘
+                </button>
+                <button
+                  class="fill-dir-btn"
+                  :class="{ active: editor.fillAngle === 45 }"
+                  @click="editor.fillAngle = 45"
+                >
+                  ↗
+                </button>
               </div>
               <div class="field-input-wrap">
                 <input
@@ -1114,7 +1156,9 @@ function onHeightChange(e) {
   background: var(--bg-input);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .fill-mode-btn.active {
   background: var(--accent);
@@ -1157,7 +1201,10 @@ function onHeightChange(e) {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
 }
 .fill-dir-btn.active {
   border-color: var(--accent);

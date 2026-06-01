@@ -146,8 +146,21 @@ function fitZoom() {
 
       <button class="btn-ghost" @click="openCreate">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3" />
-          <path d="M7 4.5v5M4.5 7h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <rect
+            x="1.5"
+            y="1.5"
+            width="11"
+            height="11"
+            rx="1.5"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <path
+            d="M7 4.5v5M4.5 7h5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
         {{ t("topbar.create") }}
       </button>

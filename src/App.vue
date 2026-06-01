@@ -44,7 +44,7 @@ const activeFilter = ref("normal");
 const filterThumbnail = ref(null);
 
 // Fill tool state
-const fillMode = ref("solid");   // 'solid' | 'gradient'
+const fillMode = ref("solid"); // 'solid' | 'gradient'
 const fillColor = ref("#4e7cf6");
 const fillColor1 = ref("#4e7cf6");
 const fillColor2 = ref("#ffffff");
@@ -349,7 +349,9 @@ provide(
     performUndo,
     performRedo,
     loadFile,
-    openCreate: () => { showCreate.value = true; },
+    openCreate: () => {
+      showCreate.value = true;
+    },
     applyCrop,
     cancelCrop,
     applyBgRemove,

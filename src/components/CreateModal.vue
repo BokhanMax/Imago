@@ -49,24 +49,43 @@ function onBackdropClick(e) {
 
 <template>
   <div class="modal-backdrop" @click="onBackdropClick">
-    <div class="modal" role="dialog" aria-modal="true" :aria-label="t('create.title')">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('create.title')"
+    >
       <div class="modal-header">
         <h2 class="modal-title">{{ t("create.title") }}</h2>
-        <button class="close-btn" @click="$emit('close')" :aria-label="t('create.cancel')">
+        <button
+          class="close-btn"
+          @click="$emit('close')"
+          :aria-label="t('create.cancel')"
+        >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path
+              d="M2 2l10 10M12 2L2 12"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
           </svg>
         </button>
       </div>
 
       <div class="modal-body">
-
         <!-- Size inputs -->
         <div class="size-row">
           <div class="size-field">
             <label class="field-label">{{ t("create.width") }}</label>
             <div class="input-px">
-              <input type="number" class="size-input" v-model.number="width" min="1" max="8000" />
+              <input
+                type="number"
+                class="size-input"
+                v-model.number="width"
+                min="1"
+                max="8000"
+              />
               <span class="px-unit">{{ t("create.px") }}</span>
             </div>
           </div>
@@ -74,7 +93,13 @@ function onBackdropClick(e) {
           <div class="size-field">
             <label class="field-label">{{ t("create.height") }}</label>
             <div class="input-px">
-              <input type="number" class="size-input" v-model.number="height" min="1" max="8000" />
+              <input
+                type="number"
+                class="size-input"
+                v-model.number="height"
+                min="1"
+                max="8000"
+              />
               <span class="px-unit">{{ t("create.px") }}</span>
             </div>
           </div>
@@ -137,8 +162,12 @@ function onBackdropClick(e) {
       </div>
 
       <div class="modal-footer">
-        <button class="btn-secondary" @click="$emit('close')">{{ t("create.cancel") }}</button>
-        <button class="btn-primary" @click="doCreate">{{ t("create.create") }}</button>
+        <button class="btn-secondary" @click="$emit('close')">
+          {{ t("create.cancel") }}
+        </button>
+        <button class="btn-primary" @click="doCreate">
+          {{ t("create.create") }}
+        </button>
       </div>
     </div>
   </div>
@@ -190,7 +219,9 @@ function onBackdropClick(e) {
   justify-content: center;
   border-radius: var(--radius-xs);
   color: var(--text-secondary);
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .close-btn:hover {
   background: var(--bg-hover);
@@ -292,7 +323,9 @@ function onBackdropClick(e) {
   font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
 }
 .bg-btn:hover {
   border-color: var(--accent);
@@ -333,7 +366,10 @@ function onBackdropClick(e) {
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
 }
 .preset-btn:hover {
   border-color: var(--accent);
@@ -367,7 +403,9 @@ function onBackdropClick(e) {
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
 }
 .btn-secondary:hover {
   border-color: var(--accent);

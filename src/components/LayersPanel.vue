@@ -271,7 +271,8 @@ const canMoveDown = computed(() => {
           class="layer-name"
           :title="layer.name"
           @dblclick.stop="startRename(layer)"
-        >{{ layer.name }}</span>
+          >{{ layer.name }}</span
+        >
       </div>
     </div>
   </aside>

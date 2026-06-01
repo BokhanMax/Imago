@@ -101,7 +101,8 @@ export default {
     dirD1: "↘",
     dirD2: "↗",
     apply: "Застосувати заливку",
-  },  create: {
+  },
+  create: {
     title: "Новий холст",
     width: "Ширина",
     height: "Висота",
