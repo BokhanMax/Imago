@@ -638,8 +638,140 @@ function getCanvasCoords(e) {
   };
 }
 
+// ── Layer move with snap guides (Photoshop-style) ───────────────────────────
+const guideCanvas = ref(null);
+let layerMoveActive = false;
+let layerMoveStartX = 0;
+let layerMoveStartY = 0;
+let layerOrigData = null;   // ImageData backup
+let layerBBox = null;       // { l, t, r, b, w, h } bounding box of non-transparent content
+
+const SNAP_THRESHOLD = 8;   // doc pixels
+
+// Find bounding box of non-transparent pixels
+function getContentBBox(imageData) {
+  const { data, width, height } = imageData;
+  let minX = width, minY = height, maxX = 0, maxY = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (minX > maxX) return null; // fully transparent
+  return { l: minX, t: minY, r: maxX, b: maxY };
+}
+
+// 9 anchor points of a rect
+function anchors9(l, t, r, b) {
+  const cx = (l + r) / 2, cy = (t + b) / 2;
+  return [
+    { x: l,  y: t  }, { x: cx, y: t  }, { x: r,  y: t  },
+    { x: l,  y: cy }, { x: cx, y: cy }, { x: r,  y: cy },
+    { x: l,  y: b  }, { x: cx, y: b  }, { x: r,  y: b  },
+  ];
+}
+
+function computeSnap(dx, dy) {
+  if (!layerBBox) return { dx, dy, guideXs: [], guideYs: [] };
+  const docW = docWidth.value, docH = docHeight.value;
+
+  // Current layer bbox after offset
+  const ll = layerBBox.l + dx, lt = layerBBox.t + dy;
+  const lr = layerBBox.r + dx, lb = layerBBox.b + dy;
+
+  const layerPts  = anchors9(ll, lt, lr, lb);
+  const docPts    = anchors9(0, 0, docW, docH);
+
+  let bestDx = null, bestDy = null;
+  let bestDistX = SNAP_THRESHOLD + 1, bestDistY = SNAP_THRESHOLD + 1;
+
+  for (const lp of layerPts) {
+    for (const dp of docPts) {
+      const distX = Math.abs(lp.x - dp.x);
+      const distY = Math.abs(lp.y - dp.y);
+      if (distX < bestDistX) { bestDistX = distX; bestDx = dp.x - lp.x + dx; }
+      if (distY < bestDistY) { bestDistY = distY; bestDy = dp.y - lp.y + dy; }
+    }
+  }
+
+  const snapDx = bestDistX <= SNAP_THRESHOLD ? bestDx : dx;
+  const snapDy = bestDistY <= SNAP_THRESHOLD ? bestDy : dy;
+
+  // Collect guide lines at snapped position
+  const guideXs = [], guideYs = [];
+  if (bestDistX <= SNAP_THRESHOLD) {
+    const sl = layerBBox.l + snapDx, sr = layerBBox.r + snapDx;
+    const sc = (sl + sr) / 2;
+    for (const dp of docPts) {
+      if (Math.abs(sl - dp.x) < 0.5 || Math.abs(sr - dp.x) < 0.5 || Math.abs(sc - dp.x) < 0.5)
+        guideXs.push(dp.x);
+    }
+  }
+  if (bestDistY <= SNAP_THRESHOLD) {
+    const st = layerBBox.t + snapDy, sb = layerBBox.b + snapDy;
+    const sc = (st + sb) / 2;
+    for (const dp of docPts) {
+      if (Math.abs(st - dp.y) < 0.5 || Math.abs(sb - dp.y) < 0.5 || Math.abs(sc - dp.y) < 0.5)
+        guideYs.push(dp.y);
+    }
+  }
+
+  return { dx: snapDx, dy: snapDy, guideXs, guideYs };
+}
+
+function drawGuides(guideXs, guideYs) {
+  const gc = guideCanvas.value;
+  if (!gc) return;
+  const zoom = editor.zoom;
+  const dpr  = window.devicePixelRatio || 1;
+  const W = gc.clientWidth, H = gc.clientHeight;
+  gc.width  = W * dpr;
+  gc.height = H * dpr;
+  const ctx = gc.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!guideXs.length && !guideYs.length) return;
+  ctx.strokeStyle = '#ff3cac';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  for (const gx of guideXs) {
+    const sx = Math.round(gx * zoom) + 0.5;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+  }
+  for (const gy of guideYs) {
+    const sy = Math.round(gy * zoom) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+  }
+}
+
+function clearGuides() {
+  const gc = guideCanvas.value;
+  if (!gc) return;
+  const ctx = gc.getContext('2d');
+  ctx.clearRect(0, 0, gc.width, gc.height);
+}
+
 function onCanvasMouseDown(e) {
   if (isCropping.value) return;
+
+  if (editor.currentTool === "move") {
+    const layer = editor.activeLayer;
+    if (!layer || layer.locked) return;
+    e.preventDefault();
+    layerMoveActive = true;
+    const { x, y } = getCanvasCoords(e);
+    layerMoveStartX = x;
+    layerMoveStartY = y;
+    const lctx = layer.canvas.getContext('2d', { willReadFrequently: true });
+    layerOrigData = lctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
+    layerBBox = getContentBBox(layerOrigData);
+    return;
+  }
 
   if (editor.currentTool === "text") {
     e.preventDefault();
@@ -659,6 +791,23 @@ function onCanvasMouseDown(e) {
 }
 
 function onCanvasMouseMove(e) {
+  if (layerMoveActive && editor.currentTool === 'move') {
+    e.preventDefault();
+    const { x, y } = getCanvasCoords(e);
+    const rawDx = x - layerMoveStartX;
+    const rawDy = y - layerMoveStartY;
+    const { dx, dy, guideXs, guideYs } = computeSnap(rawDx, rawDy);
+    const layer = editor.activeLayer;
+    if (!layer || !layerOrigData) return;
+    const { width, height } = layer.canvas;
+    const lctx = layer.canvas.getContext('2d', { willReadFrequently: true });
+    lctx.clearRect(0, 0, width, height);
+    lctx.putImageData(layerOrigData, dx, dy);
+    recomposite();
+    drawGuides(guideXs, guideYs);
+    return;
+  }
+
   if (!healStarted || editor.currentTool !== "spot") return;
   e.preventDefault();
   const { x, y } = getCanvasCoords(e);
@@ -682,6 +831,19 @@ function onCanvasMouseMove(e) {
 }
 
 function onCanvasMouseUp() {
+  if (layerMoveActive) {
+    layerMoveActive = false;
+    layerOrigData = null;
+    layerBBox = null;
+    clearGuides();
+    if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+    emit('action-complete', {
+      width: editor.activeLayer?.canvas.width,
+      height: editor.activeLayer?.canvas.height,
+    });
+    return;
+  }
+
   if (!healStarted) return;
   healStarted = false;
   isSpotPainting.value = false;
@@ -1088,18 +1250,29 @@ defineExpose({
         </div>
 
         <!-- Normal canvas mode -->
-        <canvas
-          v-show="!isCropping"
-          ref="mainCanvas"
-          class="main-canvas"
-          :class="{
-            'cursor-spot': editor.currentTool === 'spot',
-            'cursor-text-tool': editor.currentTool === 'text',
-          }"
+        <div v-show="!isCropping" class="canvas-wrap"
           :style="{ width: displayWidth + 'px', height: displayHeight + 'px' }"
-          @mousedown="onCanvasMouseDown"
-          @mousemove="onCanvasMouseMove"
-        />
+        >
+          <canvas
+            ref="mainCanvas"
+            class="main-canvas"
+            :class="{
+              'cursor-spot': editor.currentTool === 'spot',
+              'cursor-text-tool': editor.currentTool === 'text',
+              'cursor-grab': editor.currentTool === 'move' && !layerMoveActive,
+              'cursor-grabbing': editor.currentTool === 'move' && layerMoveActive,
+            }"
+            :style="{ width: displayWidth + 'px', height: displayHeight + 'px' }"
+            @mousedown="onCanvasMouseDown"
+            @mousemove="onCanvasMouseMove"
+          />
+          <!-- Snap guide overlay -->
+          <canvas
+            ref="guideCanvas"
+            class="guide-canvas"
+            :style="{ width: displayWidth + 'px', height: displayHeight + 'px' }"
+          />
+        </div>
       </div>
     </div>
 
@@ -1225,8 +1398,14 @@ defineExpose({
 }
 
 /* Main canvas */
+.canvas-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .main-canvas {
   display: block;
+  position: relative;
   box-shadow: var(--shadow-lg);
   border-radius: 2px;
   /* Checkerboard for transparency */
@@ -1245,12 +1424,27 @@ defineExpose({
   image-rendering: auto;
 }
 
+.guide-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: block;
+}
+
 .cursor-spot {
   cursor: crosshair;
 }
 
 .cursor-text-tool {
   cursor: text;
+}
+
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
 }
 
 /* Cropper wrap */
