@@ -15,6 +15,7 @@ export default {
     bg: "Remove Background (AI)",
     resize: "Resize",
     spot: "Spot Correction",
+    eraser: "Eraser",
     color: "Color Correction",
     text: "Text",
     filter: "Filters",
@@ -52,6 +53,12 @@ export default {
     size: "Brush size",
     strength: "Strength",
     hint: "Paint over the area you want to smooth",
+  },
+  eraser: {
+    title: "Eraser",
+    size: "Size",
+    hardness: "Hardness",
+    hint: "Paint over pixels to erase them to transparency",
   },
   color: {
     title: "Color Correction",

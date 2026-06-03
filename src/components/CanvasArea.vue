@@ -177,6 +177,7 @@ function loadFile(file) {
       width: img.naturalWidth,
       height: img.naturalHeight,
     });
+    nextTick(centerScroll);
   };
   img.src = url;
 }
@@ -194,6 +195,18 @@ function createBlank(width, height, background) {
   editor.addLayerFromImage(c, t("layers.background"));
   recomposite();
   emit("image-loaded", { width, height });
+  nextTick(centerScroll);
+}
+
+const CANVAS_PAD = 1200;
+
+function centerScroll() {
+  const area = scrollArea.value;
+  if (!area || !docWidth.value || !docHeight.value) return;
+  const cw = docWidth.value * editor.zoom;
+  const ch = docHeight.value * editor.zoom;
+  area.scrollLeft = CANVAS_PAD + cw / 2 - area.clientWidth / 2;
+  area.scrollTop = CANVAS_PAD + ch / 2 - area.clientHeight / 2;
 }
 
 function fitToWindow() {
@@ -202,6 +215,7 @@ function fitToWindow() {
   const scaleX = (area.clientWidth - 64) / docWidth.value;
   const scaleY = (area.clientHeight - 64) / docHeight.value;
   editor.setZoom(Math.min(1, Math.min(scaleX, scaleY)));
+  nextTick(centerScroll);
 }
 
 // ── Tool activation ──────────────────────────────────────────────────────────
@@ -712,6 +726,58 @@ let lastHealX = null;
 let lastHealY = null;
 let healStarted = false;
 
+// ── Eraser brush state ────────────────────────────────────────────────────────
+let eraserActive = false;
+let lastEraserX = null;
+let lastEraserY = null;
+
+// ── Pan (Hand tool) state ─────────────────────────────────────────────────────
+let isPanning = false;
+let panStartClientX = 0;
+let panStartClientY = 0;
+let panStartScrollLeft = 0;
+let panStartScrollTop = 0;
+let spaceDown = false;
+const isPanCursor = ref(false);
+
+function startPan(e) {
+  if (!scrollArea.value) return;
+  isPanning = true;
+  panStartClientX = e.clientX;
+  panStartClientY = e.clientY;
+  panStartScrollLeft = scrollArea.value.scrollLeft;
+  panStartScrollTop = scrollArea.value.scrollTop;
+  isPanCursor.value = true;
+}
+
+function onPanMouseMove(e) {
+  if (!isPanning || !scrollArea.value) return;
+  const dx = e.clientX - panStartClientX;
+  const dy = e.clientY - panStartClientY;
+  scrollArea.value.scrollLeft = panStartScrollLeft - dx;
+  scrollArea.value.scrollTop = panStartScrollTop - dy;
+}
+
+function stopPan() {
+  isPanning = false;
+  if (!spaceDown) isPanCursor.value = false;
+}
+
+function onKeyDown(e) {
+  if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+    spaceDown = true;
+    isPanCursor.value = true;
+    e.preventDefault();
+  }
+}
+
+function onKeyUp(e) {
+  if (e.code === 'Space') {
+    spaceDown = false;
+    if (!isPanning) isPanCursor.value = false;
+  }
+}
+
 function getCanvasCoords(e) {
   const rect = mainCanvas.value.getBoundingClientRect();
   const scaleX = docWidth.value / rect.width;
@@ -884,6 +950,13 @@ function clearGuides() {
 function onCanvasMouseDown(e) {
   if (isCropping.value) return;
 
+  // Right-click, middle-click, or Space+left-click → pan
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)) {
+    e.preventDefault();
+    startPan(e);
+    return;
+  }
+
   if (editor.currentTool === "move") {
     const layer = editor.activeLayer;
     if (!layer || layer.locked) return;
@@ -910,6 +983,18 @@ function onCanvasMouseDown(e) {
     return;
   }
 
+  if (editor.currentTool === "eraser") {
+    const layer = editor.activeLayer;
+    if (!layer || layer.locked) return;
+    e.preventDefault();
+    eraserActive = true;
+    const { x, y } = getCanvasCoords(e);
+    lastEraserX = x;
+    lastEraserY = y;
+    eraseAt(x, y);
+    return;
+  }
+
   if (editor.currentTool !== "spot") return;
   e.preventDefault();
   healStarted = true;
@@ -921,6 +1006,11 @@ function onCanvasMouseDown(e) {
 }
 
 function onCanvasMouseMove(e) {
+  if (isPanning) {
+    onPanMouseMove(e);
+    return;
+  }
+
   if (layerMoveActive && editor.currentTool === "move") {
     e.preventDefault();
     const { x, y } = getCanvasCoords(e);
@@ -940,6 +1030,33 @@ function onCanvasMouseMove(e) {
     }
     recomposite();
     drawGuides(guideXs, guideYs);
+    return;
+  }
+
+  if (editor.currentTool === 'eraser') {
+    // Always update cursor circle (no drag needed)
+    const screenRect = mainCanvas.value.getBoundingClientRect();
+    const sx = e.clientX - screenRect.left;
+    const sy = e.clientY - screenRect.top;
+    drawEraserCursor(sx, sy);
+    if (!eraserActive) return;
+    e.preventDefault();
+    const { x, y } = getCanvasCoords(e);
+    if (lastEraserX !== null) {
+      const steps = Math.max(
+        1,
+        Math.ceil(Math.hypot(x - lastEraserX, y - lastEraserY) / (editor.eraserSize * 0.25)),
+      );
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        eraseAt(
+          Math.round(lastEraserX + (x - lastEraserX) * t),
+          Math.round(lastEraserY + (y - lastEraserY) * t),
+        );
+      }
+    }
+    lastEraserX = x;
+    lastEraserY = y;
     return;
   }
 
@@ -966,6 +1083,11 @@ function onCanvasMouseMove(e) {
 }
 
 function onCanvasMouseUp() {
+  if (isPanning) {
+    stopPan();
+    return;
+  }
+
   if (layerMoveActive) {
     layerMoveActive = false;
     const layer = editor.activeLayer;
@@ -991,6 +1113,18 @@ function onCanvasMouseUp() {
     return;
   }
 
+  if (eraserActive) {
+    eraserActive = false;
+    lastEraserX = null;
+    lastEraserY = null;
+    if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+    emit('action-complete', {
+      width: editor.activeLayer?.canvas.width,
+      height: editor.activeLayer?.canvas.height,
+    });
+    return;
+  }
+
   if (!healStarted) return;
   healStarted = false;
   isSpotPainting.value = false;
@@ -998,6 +1132,79 @@ function onCanvasMouseUp() {
   lastHealY = null;
   // Bump version so LayersPanel thumbnail updates after stroke ends
   if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+}
+
+function onCanvasMouseLeave() {
+  if (editor.currentTool === 'eraser') {
+    clearGuides(); // clear cursor circle
+  }
+  if (eraserActive) {
+    eraserActive = false;
+    lastEraserX = null;
+    lastEraserY = null;
+    if (editor.activeId != null) editor.bumpLayerVersion(editor.activeId);
+    emit('action-complete', {
+      width: editor.activeLayer?.canvas.width,
+      height: editor.activeLayer?.canvas.height,
+    });
+  }
+}
+
+// ── Eraser tool ───────────────────────────────────────────────────────────────
+function eraseAt(cx, cy) {
+  const layer = editor.activeLayer;
+  if (!layer || layer.locked) return;
+  const lctx = layer.canvas.getContext('2d', { willReadFrequently: true });
+  const r = Math.max(2, editor.eraserSize / 2);
+  const hard = Math.max(0, Math.min(100, editor.eraserHardness)) / 100;
+
+  lctx.save();
+  lctx.globalCompositeOperation = 'destination-out';
+  lctx.beginPath();
+  lctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+  if (hard >= 1) {
+    lctx.fillStyle = 'rgba(0,0,0,1)';
+  } else {
+    // Soft edge: fully opaque core up to hard*r, fades to transparent at r
+    const innerR = r * hard;
+    const grad = lctx.createRadialGradient(cx, cy, innerR, cx, cy, r);
+    grad.addColorStop(0, 'rgba(0,0,0,1)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    lctx.fillStyle = grad;
+  }
+
+  lctx.fill();
+  lctx.restore();
+  recomposite();
+}
+
+function drawEraserCursor(screenX, screenY) {
+  const gc = guideCanvas.value;
+  if (!gc) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = gc.clientWidth, H = gc.clientHeight;
+  gc.width = W * dpr;
+  gc.height = H * dpr;
+  const ctx = gc.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const r = Math.max(1, (editor.eraserSize / 2) * editor.zoom);
+  // Outer dark ring
+  ctx.beginPath();
+  ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  // Inner dashed white ring
+  ctx.beginPath();
+  ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function healAt(cx, cy) {
@@ -1099,13 +1306,19 @@ function onWheel(e) {
 
 onMounted(() => {
   window.addEventListener("mouseup", onCanvasMouseUp);
+  window.addEventListener("mousemove", onPanMouseMove);
   window.addEventListener("wheel", onWheel, { passive: false });
   window.addEventListener("resize", drawRulers);
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
 });
 onUnmounted(() => {
   window.removeEventListener("mouseup", onCanvasMouseUp);
+  window.removeEventListener("mousemove", onPanMouseMove);
   window.removeEventListener("wheel", onWheel);
   window.removeEventListener("resize", drawRulers);
+  window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keyup", onKeyUp);
   if (cropper) cropper.destroy();
 });
 
@@ -1123,7 +1336,27 @@ const RULER_PX = 20;
 
 watch(
   () => editor.zoom,
-  () => nextTick(drawRulers),
+  (newZoom, oldZoom) => {
+    if (!scrollArea.value || !oldZoom) {
+      nextTick(drawRulers);
+      return;
+    }
+    const area = scrollArea.value;
+    const vw = area.clientWidth;
+    const vh = area.clientHeight;
+
+    // Canvas coordinate currently under viewport center
+    const focusX = (area.scrollLeft + vw / 2 - CANVAS_PAD) / oldZoom;
+    const focusY = (area.scrollTop + vh / 2 - CANVAS_PAD) / oldZoom;
+
+    nextTick(() => {
+      drawRulers();
+      if (!scrollArea.value) return;
+      const a = scrollArea.value;
+      a.scrollLeft = CANVAS_PAD + focusX * newZoom - vw / 2;
+      a.scrollTop = CANVAS_PAD + focusY * newZoom - vh / 2;
+    });
+  },
 );
 
 function rulerStep(zoom) {
@@ -1447,6 +1680,8 @@ defineExpose({
       class="scroll-area"
       ref="scrollArea"
       @scroll="drawRulers"
+      @contextmenu.prevent
+      :style="{ userSelect: isPanning ? 'none' : '' }"
     >
       <div class="canvas-padding">
         <!-- Cropper mode -->
@@ -1464,11 +1699,12 @@ defineExpose({
             ref="mainCanvas"
             class="main-canvas"
             :class="{
-              'cursor-spot': editor.currentTool === 'spot',
-              'cursor-text-tool': editor.currentTool === 'text',
-              'cursor-grab': editor.currentTool === 'move' && !layerMoveActive,
+              'cursor-spot': editor.currentTool === 'spot' && !isPanCursor,
+              'cursor-text-tool': editor.currentTool === 'text' && !isPanCursor,
+              'cursor-eraser': editor.currentTool === 'eraser' && !isPanCursor,
+              'cursor-grab': (editor.currentTool === 'move' && !layerMoveActive && !isPanCursor) || (isPanCursor && !isPanning),
               'cursor-grabbing':
-                editor.currentTool === 'move' && layerMoveActive,
+                (editor.currentTool === 'move' && layerMoveActive) || isPanning,
             }"
             :style="{
               width: displayWidth + 'px',
@@ -1476,6 +1712,8 @@ defineExpose({
             }"
             @mousedown="onCanvasMouseDown"
             @mousemove="onCanvasMouseMove"
+            @mouseleave="onCanvasMouseLeave"
+            @contextmenu.prevent
           />
           <!-- Snap guide overlay -->
           <canvas
@@ -1602,13 +1840,10 @@ defineExpose({
 }
 
 .canvas-padding {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  min-height: 100%;
-  min-width: 100%;
+  /* Large fixed padding so canvas always has room to pan in every direction */
+  padding: 1200px;
+  display: inline-block;
+  line-height: 0;
 }
 
 /* Main canvas */
@@ -1647,6 +1882,10 @@ defineExpose({
 
 .cursor-spot {
   cursor: crosshair;
+}
+
+.cursor-eraser {
+  cursor: none;
 }
 
 .cursor-text-tool {

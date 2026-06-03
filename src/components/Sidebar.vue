@@ -49,6 +49,15 @@ const tools = [
     </svg>`,
   },
   {
+    id: "eraser",
+    icon: `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M3.5 13.5L8 5l6.5 7.5H3.5z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
+      <path d="M3.5 13.5h7" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+      <path d="M8 5l6.5 7.5-3.5 2L4.5 7.2" stroke="currentColor" stroke-width="0" fill="currentColor" opacity="0.15"/>
+      <rect x="8" y="11" width="6" height="2.5" rx="0.8" fill="currentColor" opacity="0.2"/>
+    </svg>`,
+  },
+  {
     id: "color",
     icon: `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
       <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.4"/>

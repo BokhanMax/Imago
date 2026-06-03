@@ -253,6 +253,43 @@ function onHeightChange(e) {
       </div>
     </template>
 
+    <!-- Eraser Panel -->
+    <template v-else-if="tool === 'eraser'">
+      <div class="panel-section">
+        <div class="section-title">{{ t("eraser.title") }}</div>
+        <div class="slider-row">
+          <label class="slider-label">{{ t("eraser.size") }}</label>
+          <div class="slider-wrap">
+            <input
+              type="range"
+              class="slider"
+              min="4"
+              max="200"
+              v-model.number="editor.eraserSize"
+            />
+            <span class="slider-value">{{ editor.eraserSize }}</span>
+          </div>
+        </div>
+        <div class="slider-row">
+          <label class="slider-label">{{ t("eraser.hardness") }}</label>
+          <div class="slider-wrap">
+            <input
+              type="range"
+              class="slider"
+              min="0"
+              max="100"
+              step="5"
+              v-model.number="editor.eraserHardness"
+            />
+            <span class="slider-value">{{ editor.eraserHardness }}%</span>
+          </div>
+        </div>
+        <p class="hint-text" style="margin-top: 4px">
+          {{ t("eraser.hint") }}
+        </p>
+      </div>
+    </template>
+
     <!-- Color Panel -->
     <template v-else-if="tool === 'color'">
       <div class="panel-section">

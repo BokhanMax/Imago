@@ -50,6 +50,10 @@ const fillColor1 = ref("#4e7cf6");
 const fillColor2 = ref("#ffffff");
 const fillAngle = ref(90);
 
+// Eraser tool state
+const eraserSize = ref(30);
+const eraserHardness = ref(80);
+
 // Text tool state
 const textContent = ref("");
 const textSize = ref(48);
@@ -187,7 +191,11 @@ async function onActionComplete(dims) {
     resizeWidth.value = dims.width;
     resizeHeight.value = dims.height;
   }
-  currentTool.value = "move";
+  // Brush-style tools stay active between strokes
+  const persistentTools = ["eraser", "spot"];
+  if (!persistentTools.includes(currentTool.value)) {
+    currentTool.value = "move";
+  }
   await saveSnapshot();
 }
 
@@ -339,6 +347,9 @@ provide(
     fillColor1,
     fillColor2,
     fillAngle,
+    // Eraser tool state
+    eraserSize,
+    eraserHardness,
     // Layers state (refs/computed auto-unwrap inside reactive)
     layers,
     activeId,
